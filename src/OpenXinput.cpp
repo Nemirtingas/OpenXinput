@@ -2084,7 +2084,7 @@ BOOL GetDeviceInterfaceDetail(HDEVINFO DeviceInfoSet, PSP_DEVICE_INTERFACE_DATA 
     if (g_pfnGetDeviceInterfaceDetail)
         return g_pfnGetDeviceInterfaceDetail(DeviceInfoSet, DeviceInterfaceData, DeviceInterfaceDetailData, DeviceInterfaceDetailDataSize, RequiredSize, DeviceInfoData);
 
-    return SetupDiGetDeviceInterfaceDetail(DeviceInfoSet, DeviceInterfaceData, DeviceInterfaceDetailData, DeviceInterfaceDetailDataSize, RequiredSize, DeviceInfoData);;
+    return SetupDiGetDeviceInterfaceDetailW(DeviceInfoSet, DeviceInterfaceData, DeviceInterfaceDetailData, DeviceInterfaceDetailDataSize, RequiredSize, DeviceInfoData);;
 }
 
 BOOL DestroyDeviceInfoList(HDEVINFO DeviceInfoSet)
@@ -2532,9 +2532,12 @@ DWORD Controller_CalculateKeyFromThumbPos(SHORT base, SHORT X, SHORT Y)
 extern "C" {
 #endif
 
-BOOL DllMain(HINSTANCE hInstDll, DWORD fdwReason, LPVOID lpvReserved)
+#ifdef OPENXINPUT_BUILD_SHARED
+
+BOOL WINAPI DllMain(HINSTANCE hInstDll, DWORD fdwReason, LPVOID lpvReserved)
 {
     BOOL res = TRUE;
+    HRESULT hr;
 
     switch (fdwReason)
     {
@@ -2560,7 +2563,21 @@ BOOL DllMain(HINSTANCE hInstDll, DWORD fdwReason, LPVOID lpvReserved)
     return res;
 }
 
-DWORD WINAPI XInputGetState(_In_ DWORD dwUserIndex, _Out_ XINPUT_STATE* pState)
+#else
+
+int OpenXinputInitLibrary()
+{
+    return (XInputCore::Initialize() == TRUE ? ERROR_SUCCESS : ERROR_NOT_ENOUGH_MEMORY);
+}
+
+void OpenXinputReleaseLibrary()
+{
+    XInputCore::Close();
+}
+
+#endif
+
+DWORD WINAPI OpenXInputGetState(_In_ DWORD dwUserIndex, _Out_ XINPUT_STATE* pState)
 {
     GetStateApiParam_t apiParam;
     HRESULT hr;
@@ -2580,7 +2597,7 @@ DWORD WINAPI XInputGetState(_In_ DWORD dwUserIndex, _Out_ XINPUT_STATE* pState)
     return result;
 }
 
-DWORD WINAPI XInputSetState(_In_ DWORD dwUserIndex, _In_ XINPUT_VIBRATION* pVibration)
+DWORD WINAPI OpenXInputSetState(_In_ DWORD dwUserIndex, _In_ XINPUT_VIBRATION* pVibration)
 {
     SetStateApiParam_t apiParam;
     HRESULT hr;
@@ -2594,7 +2611,7 @@ DWORD WINAPI XInputSetState(_In_ DWORD dwUserIndex, _In_ XINPUT_VIBRATION* pVibr
     return XInputReturnCodeFromHRESULT(hr);
 }
 
-DWORD XInputGetCapabilities(_In_ DWORD dwUserIndex, _In_ DWORD dwFlags, _Out_ XINPUT_CAPABILITIES* pCapabilities)
+DWORD WINAPI OpenXInputGetCapabilities(_In_ DWORD dwUserIndex, _In_ DWORD dwFlags, _Out_ XINPUT_CAPABILITIES* pCapabilities)
 {
     GetCapabilitiesApiParam_t apiParam;
     DWORD result;
@@ -2613,12 +2630,12 @@ DWORD XInputGetCapabilities(_In_ DWORD dwUserIndex, _In_ DWORD dwFlags, _Out_ XI
     return result;
 }
 
-void WINAPI XInputEnable(_In_ BOOL enable)
+void WINAPI OpenXInputEnable(_In_ BOOL enable)
 {
     XInputCore::EnableCommunications(enable != FALSE);
 }
 
-DWORD WINAPI XInputGetDSoundAudioDeviceGuids(_In_ DWORD dwUserIndex, _Out_ GUID* pDSoundRenderGuid, _Out_ GUID* pDSoundCaptureGuid)
+DWORD WINAPI OpenXInputGetDSoundAudioDeviceGuids(_In_ DWORD dwUserIndex, _Out_ GUID* pDSoundRenderGuid, _Out_ GUID* pDSoundCaptureGuid)
 {
     HRESULT hr;
     DWORD result;
@@ -2665,7 +2682,7 @@ DWORD WINAPI XInputGetDSoundAudioDeviceGuids(_In_ DWORD dwUserIndex, _Out_ GUID*
     return result;
 }
 
-DWORD WINAPI XInputGetBatteryInformation(_In_ DWORD dwUserIndex, _In_ BYTE devType, _Out_ XINPUT_BATTERY_INFORMATION* pBatteryInformation)
+DWORD WINAPI OpenXInputGetBatteryInformation(_In_ DWORD dwUserIndex, _In_ BYTE devType, _Out_ XINPUT_BATTERY_INFORMATION* pBatteryInformation)
 {
     DWORD result;
     HRESULT hr;
@@ -2718,7 +2735,7 @@ DWORD WINAPI XInputGetBatteryInformation(_In_ DWORD dwUserIndex, _In_ BYTE devTy
     return result;
 }
 
-DWORD WINAPI XInputGetKeystroke(_In_ DWORD dwUserIndex, _Reserved_ DWORD dwReserved, _Out_ PXINPUT_KEYSTROKE pKeystroke)
+DWORD WINAPI OpenXInputGetKeystroke(_In_ DWORD dwUserIndex, _Reserved_ DWORD dwReserved, _Out_ PXINPUT_KEYSTROKE pKeystroke)
 {
     GetKeystrokeApiParam_t apiParam;
     DWORD result;
@@ -2757,7 +2774,7 @@ DWORD WINAPI XInputGetKeystroke(_In_ DWORD dwUserIndex, _Reserved_ DWORD dwReser
     return result;
 }
 
-DWORD WINAPI XInputGetStateEx(_In_ DWORD dwUserIndex, _Out_ XINPUT_STATE* pState)
+DWORD WINAPI OpenXInputGetStateEx(_In_ DWORD dwUserIndex, _Out_ XINPUT_STATE* pState)
 {
     HRESULT hr;
     GetStateApiParam_t apiParam;
@@ -2771,7 +2788,7 @@ DWORD WINAPI XInputGetStateEx(_In_ DWORD dwUserIndex, _Out_ XINPUT_STATE* pState
     return XInputReturnCodeFromHRESULT(hr);
 }
 
-DWORD WINAPI XInputWaitForGuideButton(_In_ DWORD dwUserIndex, _In_ HANDLE hEvent, _Out_ XINPUT_LISTEN_STATE* pListenState)
+DWORD WINAPI OpenXInputWaitForGuideButton(_In_ DWORD dwUserIndex, _In_ HANDLE hEvent, _Out_ XINPUT_LISTEN_STATE* pListenState)
 {
     HRESULT hr;
     WaitGuideButtonApiParam_t apiParam;
@@ -2789,7 +2806,7 @@ DWORD WINAPI XInputWaitForGuideButton(_In_ DWORD dwUserIndex, _In_ HANDLE hEvent
     return XInputReturnCodeFromHRESULT(hr);
 }
 
-DWORD WINAPI XInputCancelGuideButtonWait(_In_ DWORD dwUserIndex)
+DWORD WINAPI OpenXInputCancelGuideButtonWait(_In_ DWORD dwUserIndex)
 {
     HRESULT hr;
 
@@ -2800,7 +2817,7 @@ DWORD WINAPI XInputCancelGuideButtonWait(_In_ DWORD dwUserIndex)
     return XInputReturnCodeFromHRESULT(hr);
 }
 
-DWORD WINAPI XInputPowerOffController(_In_ DWORD dwUserIndex)
+DWORD WINAPI OpenXInputPowerOffController(_In_ DWORD dwUserIndex)
 {
     HRESULT hr;
 
@@ -2812,7 +2829,7 @@ DWORD WINAPI XInputPowerOffController(_In_ DWORD dwUserIndex)
 
 }
 
-DWORD WINAPI XInputGetMaxControllerCount()
+DWORD WINAPI OpenXInputGetMaxControllerCount()
 {
     return XUSER_MAX_COUNT;
 }

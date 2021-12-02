@@ -16,13 +16,10 @@
  */
 
 #include <Windows.h>
-#include "../OpenXinput.h"
+#include <OpenXinput.h>
 
 #include <thread>
 #include <iostream>
-
-#pragma comment(lib, "Xinput1_3.lib")
-//#pragma comment(lib, "Xinput.lib")
 
 #ifndef XINPUT_GAMEPAD_GUIDE
 #define XINPUT_GAMEPAD_GUIDE 0x0400
@@ -376,7 +373,7 @@ void test_keystroke()
     std::cout << "Press BACK + START to exit." << std::endl;
     while (run)
     {
-        if (XInputGetKeystroke(XUSER_INDEX_ANY, 0, &state) == ERROR_SUCCESS)
+        if (OpenXInputGetKeystroke(XUSER_INDEX_ANY, 0, &state) == ERROR_SUCCESS)
         {
             switch(state.VirtualKey)
             {
@@ -485,11 +482,11 @@ void OnDeviceConnect(XInputDevice_t& device)
     // When using a wireless controller, the battery infos are not ready right now.
     for (int i = 0; i < 20 && device.battery.BatteryType == BATTERY_TYPE_DISCONNECTED; ++i)
     {
-        XInputGetBatteryInformation(device.deviceIndex, 0, &device.battery);
+        OpenXInputGetBatteryInformation(device.deviceIndex, 0, &device.battery);
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
 
-    XInputGetCapabilities(device.deviceIndex, XINPUT_FLAG_GAMEPAD, &device.capabilities);
+    OpenXInputGetCapabilities(device.deviceIndex, XINPUT_FLAG_GAMEPAD, &device.capabilities);
 
     OnDeviceInfoChange(device);
 }
@@ -507,15 +504,19 @@ void OnDeviceDisconnect(XInputDevice_t& device)
 
 int main(int argc, char* argv[])
 {
+#ifdef OPENXINPUT_BUILD_SHARED
     HMODULE hXinput = GetModuleHandleW(L"Xinput1_3.dll");
     if (hXinput != NULL)
     {
-        XInputGetMaxControllerCount_t* pfnXInputGetMaxControllerCount_t = (XInputGetMaxControllerCount_t*)GetProcAddress(hXinput, "XInputGetMaxControllerCount");
-        if (pfnXInputGetMaxControllerCount_t != nullptr)
+        OpenXInputGetMaxControllerCount_t* pfnOpenXInputGetMaxControllerCount_t = (OpenXInputGetMaxControllerCount_t*)GetProcAddress(hXinput, "OpenXInputGetMaxControllerCount");
+        if (pfnOpenXInputGetMaxControllerCount_t != nullptr)
         {// We are using OpenXinput, check for the max controller count.
-            XinputMaxControllerCount = pfnXInputGetMaxControllerCount_t();
+            XinputMaxControllerCount = pfnOpenXInputGetMaxControllerCount_t();
         }
     }
+#else
+    OpenXinputInitLibrary();
+#endif
 
     std::unique_ptr<XInputDevice_t[]> devices = std::make_unique<XInputDevice_t[]>(XinputMaxControllerCount);
     memset(devices.get(), 0, sizeof(XInputDevice_t) * XinputMaxControllerCount);
@@ -535,7 +536,7 @@ int main(int argc, char* argv[])
         for (int i = 0; i < XinputMaxControllerCount; ++i)
         {
             XInputDevice_t& device = devices[i];
-            if (XInputGetStateEx(i, &device.state) == ERROR_SUCCESS)
+            if (OpenXInputGetStateEx(i, &device.state) == ERROR_SUCCESS)
             {
                 if (device.connected == false)
                 {
@@ -553,6 +554,10 @@ int main(int argc, char* argv[])
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(20));
     }
+
+#ifndef OPENXINPUT_BUILD_SHARED
+    OpenXinputReleaseLibrary();
+#endif
 
     return 0;
 }

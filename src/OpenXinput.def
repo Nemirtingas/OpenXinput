@@ -13,4 +13,4 @@ XInputWaitForGuideButton        @101 NONAME
 XInputCancelGuideButtonWait     @102 NONAME
 XInputPowerOffController        @103 NONAME
 
-XInputGetMaxControllerCount     @999
+OpenXInputGetMaxControllerCount @999

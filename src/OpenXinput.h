@@ -17,13 +17,37 @@
 
 #pragma once
 
-#include <Windows.h>
+#ifdef OPENXINPUT_BUILD_SHARED
 
-#define OPENXINPUT_NO_XINPUT_HEADER
+#define OpenXInputGetState                  XInputGetState
+#define OpenXInputSetState                  XInputSetState
+#define OpenXInputGetCapabilities           XInputGetCapabilities
+#define OpenXInputEnable                    XInputEnable
+#define OpenXInputGetDSoundAudioDeviceGuids XInputGetDSoundAudioDeviceGuids
+#define OpenXInputGetBatteryInformation     XInputGetBatteryInformation
+#define OpenXInputGetKeystroke              XInputGetKeystroke
+#define OpenXInputGetStateEx                XInputGetStateEx
+#define OpenXInputWaitForGuideButton        XInputWaitForGuideButton
+#define OpenXInputCancelGuideButtonWait     XInputCancelGuideButtonWait
+#define OpenXInputPowerOffController        XInputPowerOffController
 
-#if !defined(OPENXINPUT_NO_XINPUT_HEADER)
-#include <Xinput.h>
 #else
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+// Returns ERROR_SUCCESS on success.
+int OpenXinputInitLibrary();
+void OpenXinputReleaseLibrary();
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif
+
+#include <Windows.h>
 
 #pragma region Application Family
 #if WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_APP)
@@ -249,19 +273,19 @@ extern "C" {
 #pragma region Application Family
 #if WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_APP)
 
-DWORD WINAPI XInputGetState
+DWORD WINAPI OpenXInputGetState
 (
     _In_  DWORD         dwUserIndex,  // Index of the gamer associated with the device
     _Out_ XINPUT_STATE* pState        // Receives the current state
 );
 
-DWORD WINAPI XInputSetState
+DWORD WINAPI OpenXInputSetState
 (
     _In_ DWORD             dwUserIndex,  // Index of the gamer associated with the device
     _In_ XINPUT_VIBRATION* pVibration    // The vibration information to send to the controller
 );
 
-DWORD WINAPI XInputGetCapabilities
+DWORD WINAPI OpenXInputGetCapabilities
 (
     _In_  DWORD                dwUserIndex,   // Index of the gamer associated with the device
     _In_  DWORD                dwFlags,       // Input flags that identify the device type
@@ -270,7 +294,7 @@ DWORD WINAPI XInputGetCapabilities
 
 #if(_WIN32_WINNT >= _WIN32_WINNT_WIN8)
 
-void WINAPI XInputEnable
+void WINAPI OpenXInputEnable
 (
     _In_ BOOL enable     // [in] Indicates whether xinput is enabled or disabled. 
 );
@@ -279,7 +303,7 @@ void WINAPI XInputEnable
 #pragma deprecated(XInputEnable)
 #endif
 
-DWORD WINAPI XInputGetAudioDeviceIds
+DWORD WINAPI OpenXInputGetAudioDeviceIds
 (
     _In_  DWORD                             dwUserIndex,        // Index of the gamer associated with the device
     _Out_writes_opt_(*pRenderCount) LPWSTR  pRenderDeviceId,    // Windows Core Audio device ID string for render (speakers)
@@ -288,14 +312,14 @@ DWORD WINAPI XInputGetAudioDeviceIds
     _Inout_opt_ UINT*                       pCaptureCount       // Size of capture device ID string buffer (in wide-chars)
 );
 
-DWORD WINAPI XInputGetBatteryInformation
+DWORD WINAPI OpenXInputGetBatteryInformation
 (
     _In_  DWORD                       dwUserIndex,        // Index of the gamer associated with the device
     _In_  BYTE                        devType,            // Which device on this user index
     _Out_ XINPUT_BATTERY_INFORMATION* pBatteryInformation // Contains the level and types of batteries
 );
 
-DWORD WINAPI XInputGetKeystroke
+DWORD WINAPI OpenXInputGetKeystroke
 (
     _In_       DWORD dwUserIndex,              // Index of the gamer associated with the device
     _Reserved_ DWORD dwReserved,               // Reserved for future use
@@ -312,7 +336,7 @@ DWORD WINAPI XInputGetKeystroke
 
 #if(_WIN32_WINNT < _WIN32_WINNT_WIN8)
 
-DWORD WINAPI XInputGetDSoundAudioDeviceGuids
+DWORD WINAPI OpenXInputGetDSoundAudioDeviceGuids
 (
     _In_  DWORD     dwUserIndex,          // Index of the gamer associated with the device
     _Out_ GUID*     pDSoundRenderGuid,    // DSound device ID for render (speakers)
@@ -326,8 +350,6 @@ DWORD WINAPI XInputGetDSoundAudioDeviceGuids
 
 #ifdef __cplusplus
 }
-#endif
-
 #endif
 
 #ifdef XUSER_MAX_COUNT
@@ -344,18 +366,20 @@ DWORD WINAPI XInputGetDSoundAudioDeviceGuids
     #define XUSER_MAX_COUNT OPENXINPUT_XUSER_MAX_COUNT
 #endif
 
+// End of Xinput.h
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 // This is my own added exported symbol.
 // It returns the compile-time XUSER_MAX_COUNT.
-DWORD WINAPI XInputGetMaxControllerCount();
+DWORD WINAPI OpenXInputGetMaxControllerCount();
 
 #ifdef __cplusplus
 }
 #endif
-typedef DWORD(WINAPI XInputGetMaxControllerCount_t)();
+typedef DWORD(WINAPI OpenXInputGetMaxControllerCount_t)();
 
 
 ////////////////////////////////////////
@@ -396,14 +420,14 @@ struct XINPUT_GUIDE_EVENT
 extern "C" {
 #endif
 
-DWORD WINAPI XInputGetStateEx(_In_ DWORD dwUserIndex, _Out_ XINPUT_STATE* pState);
+DWORD WINAPI OpenXInputGetStateEx(_In_ DWORD dwUserIndex, _Out_ XINPUT_STATE* pState);
 
 // Pass INVALID_HANDLE_VALUE or NULL in hEvent for a synchronous wait
-DWORD WINAPI XInputWaitForGuideButton(_In_ DWORD dwUserIndex, _In_ HANDLE hEvent, _Out_ XINPUT_LISTEN_STATE* pListenState);
+DWORD WINAPI OpenXInputWaitForGuideButton(_In_ DWORD dwUserIndex, _In_ HANDLE hEvent, _Out_ XINPUT_LISTEN_STATE* pListenState);
 
-DWORD WINAPI XInputCancelGuideButtonWait(_In_ DWORD dwUserIndex);
+DWORD WINAPI OpenXInputCancelGuideButtonWait(_In_ DWORD dwUserIndex);
 
-DWORD WINAPI XInputPowerOffController(_In_ DWORD dwUserIndex);
+DWORD WINAPI OpenXInputPowerOffController(_In_ DWORD dwUserIndex);
 
 #ifdef __cplusplus
 }

@@ -20,12 +20,26 @@
 #if(_WIN32_WINNT >= _WIN32_WINNT_WIN10)
 // XInputEnable is deprecated since Windows 10, disable the warning if needed to build Xinput.
 #pragma warning(disable : 4995)
+// Disable 4996 because of GetVersionExW
+#pragma warning(disable : 4996)
 #endif
+
+DEFINE_HIDDEN_GUID(CLSID_DeviceBroker, 0xACC56A05, 0xE277, 0x4B1E, 0xA4, 0x3E, 0x7A, 0x73, 0xE3, 0xCD, 0x6E, 0x6C);
+DEFINE_HIDDEN_GUID(GUID_8604b268_34a6_4b1a_a59f_cdbd8379fd98, 0x8604b268, 0x34a6, 0x4b1a, 0xa5, 0x9f, 0xcd, 0xbd, 0x83, 0x79, 0xfd, 0x98);
+
+typedef struct _SP_XINPUTINFO_DATA
+{ // Tuned SP_DEVINFO_DATA
+    DWORD cbSize;
+    GUID  ClassGuid;
+    DWORD DevInst;    // DEVINST handle
+    ULONG_PTR Reserved1;
+    ULONG_PTR Reserved2;
+    ULONG_PTR Reserved3;
+} SP_XINPUTINFO_DATA, * PSP_XINPUTINFO_DATA;
 
 /////////////////////////////////////////////////////
 // Declarations
 /////////////////////////////////////////////////////
-
 struct DeviceInfo_t {
     DWORD status;
     HANDLE hDevice;
@@ -40,45 +54,43 @@ struct DeviceInfo_t {
     XINPUT_STATE DeviceState;
     XINPUT_VIBRATION DeviceVibration;
     WORD field_38;
-    WORD field_3A;
-    WORD field_3C;
-    WORD field_3E;
-    WORD field_40;
-    WORD field_42;
-    WORD field_44;
-    WORD field_46;
-    WORD field_48;
-    WORD field_4A;
-    WORD field_4C;
     WORD vendorId;
     WORD productId;
-    BYTE inputId;
+    WORD inputId;
+    int dwBusIndex;
     BYTE bTriggers;
     WORD wButtons;
     WORD LeftStickVirtualKey;
     WORD RightStickVirtualKey;
-    WORD field_5A;
-    WORD field_5C;
-    WORD field_5E;
+    WORD field_4C;
+    WORD field_4E;
 };
+
+struct XINPUT_AUDIO_INFORMATION
+{
+    WORD vendorId;
+    WORD productId;
+    BYTE inputId;
+};
+
 // All theses structs are passed to the XUSB driver, they __NEED__ to be unaligned.
 #pragma pack(push, 1)
 struct InSetLEDBuffer_t
 {
     BYTE deviceIndex;
     BYTE state;
-    BYTE pad1;
-    BYTE pad2;
     BYTE unk0;
+    BYTE unk1;
+    BYTE unk2;
 };
 
 struct InVibrationBuffer_t
 {
     BYTE deviceIndex;
-    BYTE pad1;
+    BYTE unk0;
     BYTE leftMotorSpeed;
     BYTE rightMotorSpeed;
-    BYTE unk0;
+    BYTE unk1;
 };
 
 struct InGetAudioDeviceInformation_t
@@ -113,8 +125,9 @@ struct OutDeviceInfos_t
     WORD wType;
     BYTE deviceIndex;
     BYTE unk1;
-    WORD unk2;
-    WORD unk3;
+    BYTE unk2;
+    BYTE unk3;
+    WORD unk4;
     WORD vendorId;
     WORD productId;
 };
@@ -237,6 +250,80 @@ struct GamepadCapabilities0101
     BYTE  bRightMotorSpeed;
 };
 
+struct GamepadCapabilities0102
+{
+    BYTE unk0;
+    BYTE unk1;
+    BYTE Type;
+    BYTE SubType;
+    WORD Flags;
+    WORD vendorId;
+    WORD productId;
+    SHORT unk2;
+    DWORD unk3;
+    WORD wButtons;
+    BYTE bLeftTrigger;
+    BYTE bRightTrigger;
+    SHORT sThumbLX;
+    SHORT sThumbLY;
+    WORD sThumbRX;
+    WORD sThumbRY;
+    DWORD unk4;
+    BYTE unk5;
+    BYTE unk6;
+    BYTE wLeftMotorSpeed;
+    BYTE wRightMotorSpeed;
+};
+
+struct InBaseBusInformation
+{
+    WORD wType;
+    BYTE unk0;
+    WORD field_4;
+    WORD field_6;
+    WORD field_8;
+    WORD field_A;
+    WORD field_C;
+    WORD field_E;
+    WORD field_10;
+    WORD field_12;
+    WORD field_14;
+    WORD field_16;
+    WORD field_18;
+    WORD field_1A;
+    WORD field_1C;
+    WORD field_1E;
+    WORD field_20;
+    WORD field_22;
+};
+
+struct OutBaseBusInformation
+{
+    BYTE field_0;
+    BYTE field_1;
+    BYTE field_2;
+    BYTE field_3;
+    DWORD field_4;
+    DWORD field_8;
+    DWORD field_C;
+    DWORD field_10;
+    BYTE field_14;
+    BYTE field_15;
+    BYTE field_16;
+    WORD vendorId;
+    WORD productId;
+    WORD inputId;
+    BYTE field_1D;
+    BYTE field_1E;
+    BYTE field_1F;
+    BYTE field_20;
+    BYTE field_21;
+    BYTE field_22;
+    BYTE field_23;
+    DWORD field_24;
+    BYTE field_28[909];
+};
+
 struct InGamepadBatteryInformation0102
 {
     WORD wType;
@@ -263,17 +350,12 @@ struct SetStateApiParam_t
     XINPUT_VIBRATION* pVibration;
 };
 
-struct DSoundCallbackParam_t
+struct GetAudioDeviceIdApiParam_t
 {
-    PCWSTR DevicePath;
-    GUID* HeadphoneGuid;
-    GUID* MicrophoneGuid;
-};
-
-struct GetAudioDeviceGuidsApiParam_t
-{
-    GUID* pHeadphoneGuid;
-    GUID* pMicrophoneGuid;
+    LPWSTR pRenderDeviceId;
+    UINT* pRenderCount;
+    LPWSTR pCaptureDeviceId;
+    UINT* pCaptureCount;
 };
 
 struct GetBatteryInformationApiParam_t
@@ -284,7 +366,7 @@ struct GetBatteryInformationApiParam_t
 
 struct GetCapabilitiesApiParam_t
 {
-    XINPUT_CAPABILITIES* pCapabilities;
+    XINPUT_CAPABILITIES_EX* pCapabilities;
 };
 
 struct GetKeystrokeApiParam_t
@@ -308,6 +390,11 @@ struct WaitForGuideButtonHelperApiParam_t
     XINPUT_LISTEN_STATE* pListenState;
 };
 
+struct GetBaseBusInformationApiParam_t
+{
+    XINPUT_BASE_BUS_INFORMATION* pBaseBusInformation;
+};
+
 constexpr DWORD SET_USER_LED_ON_CREATE       = (1 << 0);
 constexpr DWORD DISABLE_USER_LED_ON_DESTROY  = (1 << 1);
 constexpr DWORD DISABLE_VIBRATION_ON_DESTROY = (1 << 2);
@@ -321,18 +408,23 @@ static PVOID g_pDetailBuffer;
 static DWORD g_dwDetailBufferSize;
 
 static decltype(DeviceIoControl)* g_pfnDeviceIoControl;
-static decltype(SetupDiGetClassDevsW)* g_pfnGetClassDevs;
-static decltype(SetupDiEnumDeviceInterfaces)* g_pfnEnumDeviceInterfaces;
-static decltype(SetupDiGetDeviceInterfaceDetailW)* g_pfnGetDeviceInterfaceDetail;
-static decltype(SetupDiDestroyDeviceInfoList)* g_pfnDestroyDeviceInfoList;
+static decltype(DevObjCreateDeviceInfoList)* g_pfnCreateDeviceInfoList;
+static decltype(DevObjGetClassDevs)* g_pfnGetClassDevs;
+static decltype(DevObjEnumDeviceInfo)* g_pfnEnumDeviceInfo;
+static decltype(DevObjEnumDeviceInterfaces)* g_pfnEnumDeviceInterfaces;
+static decltype(DevObjGetDeviceInterfaceDetail)* g_pfnGetDeviceInterfaceDetail;
+static decltype(DevObjGetDeviceProperty)* g_pfnGetDeviceProperty;
+static decltype(DevObjDestroyDeviceInfoList)* g_pfnDestroyDeviceInfoList;
 
 static BOOL g_IsInitialized = FALSE;
 static BOOL g_IsCommunicationEnabled = FALSE;
 
 static RTL_CRITICAL_SECTION g_csGlobalLock;
 static DWORD g_dwSettings = SET_USER_LED_ON_CREATE | DISABLE_USER_LED_ON_DESTROY | DISABLE_VIBRATION_ON_DESTROY;
+
 static DWORD g_dwDeviceListSize = 0;
 static DeviceInfo_t** g_pDeviceList;
+static DeviceInfo_t** g_pBusDeviceList;
 
 static DWORD g_dwLogVerbosity = 0;
 
@@ -342,23 +434,60 @@ HRESULT GrowList(DWORD newSize);
 
 void CopyGamepadStateToDeviceInfo(DeviceInfo_t* pDevice, GamepadState0100* pGamepadState);
 void CopyGamepadStateToDeviceInfo(DeviceInfo_t* pDevice, GamepadState0101* pGamepadState);
-void TranslateCapabilities(GamepadCapabilities0101* pGamepadCapabilities, XINPUT_CAPABILITIES* pCapabilities);
+void TranslateCapabilities(DeviceInfo_t* pDevice, GamepadCapabilities0101* pGamepadCapabilities, XINPUT_CAPABILITIES_EX* pCapabilities);
+void TranslateCapabilities(GamepadCapabilities0102* pGamepadCapabilities, XINPUT_CAPABILITIES_EX* pCapabilitiesEx);
 
 HRESULT SendReceiveIoctl(HANDLE hDevice, DWORD dwIoControlCode, LPVOID lpInBuffer, DWORD nInBufferSize, LPVOID lpOutBuffer, DWORD nOutBufferSize, LPOVERLAPPED lpOverlapped);
 HRESULT SendIoctl(HANDLE hDevice, DWORD dwIoControlCode, LPVOID lpInBuffer, DWORD nInBufferSize);
 HRESULT ReceiveIoctl(HANDLE hDevice, DWORD dwIoControlCode, LPVOID lpOutBuffer, DWORD nOufBufferSize);
 
 HRESULT EnumerateXInputDevices();
-HRESULT EnumerateDevicesOnDeviceInterface(HANDLE hDevice, LPCWSTR lpDevicePath);
+HRESULT EnumerateDevicesOnDeviceInterface(HANDLE hDevice, LPCWSTR DevicePath);
 HRESULT ProcessEnumeratedDevice(DeviceInfo_t* pDevice);
 
-HRESULT GetDeviceList(HDEVINFO* phDevInfo);
-HRESULT GetDeviceInterfaceData(HDEVINFO DeviceInfoSet, DWORD MemberIndex, PSP_DEVICE_INTERFACE_DATA DeviceInterfaceData);
-HRESULT GetDeviceInterfaceDetail(HDEVINFO hDeviceInfo, PSP_DEVICE_INTERFACE_DATA DeviceInterfaceData, PSP_DEVICE_INTERFACE_DETAIL_DATA_W* ppDeviceInterfaceDetailData);
+HRESULT GetAudioInterfaceStringInfo(DeviceInfo_t* pDevice, WORD* VendorId, WORD* ProductId, BYTE* InputId);
+HRESULT GetDeviceInterfaceDetail(HANDLE hDev, PDO_DEVICE_INTERFACE_DATA DeviceInterfaceData, PDO_DEVICE_INTERFACE_DETAIL_DATA* ppDeviceInterfaceDetailData);
 
 DWORD CALLBACK WaitForGuideButtonHelper(void* pParam);
 
-BOOL CALLBACK DirectSoundEnumerateCallback(PDSPROPERTY_DIRECTSOUNDDEVICE_DESCRIPTION_W_DATA lpData, LPVOID lpUser);
+/////////////////////////////////////////////////////
+// DevQuery namespace
+/////////////////////////////////////////////////////
+namespace DevQuery {
+
+struct DevQuery_t {
+    HANDLE hEvent;
+    DEVPROPKEY DeviceInterfaceId;
+    LPVOID unk1;
+    LPVOID unk2;
+    LPWSTR lpDeviceId;
+    UINT*  lpuiDeviceIdCount;
+};
+
+struct DevQueryCallbackParam_t {
+    BOOL unk1;
+    LPVOID unk2;
+    LPWSTR lpDevicePath;
+};
+
+DevQuery_t* Create();
+void Destroy(DevQuery_t* pDevQuery);
+HRESULT RenderQuery(DevQuery_t* pDeviceQuery, GUID DeviceGuid, int a3, LPWSTR lpDeviceId, UINT* lpuiDeviceIdCount);
+HRESULT CaptureQuery(DevQuery_t* pDeviceQuery, GUID DeviceGuid, int a3, LPWSTR lpDeviceId, UINT* lpuiDeviceIdCount);
+
+void CALLBACK DevQueryCallbackProc(HDEVQUERY hQuery, LPVOID pUserParam, PDEV_QUERY_RESULT_ACTION_DATA pCallbackData);
+
+}
+
+/////////////////////////////////////////////////////
+// DevQuery namespace
+/////////////////////////////////////////////////////
+namespace DeviceProperty {
+
+LPVOID* CreateInstance(HANDLE hDev, SP_XINPUTINFO_DATA* unk1, const PROPERTYKEY* lpPropertyKey);
+void DestroyInstance(LPVOID* ppInstance);
+    
+}
 
 }
 
@@ -371,7 +500,6 @@ DEFINE_HIDDEN_GUID(XUSB_INTERFACE_CLASS_GUID, 0xEC87F1E3, 0xC13B, 0x4100, 0xB5, 
 
 constexpr DWORD IOCTL_XINPUT_BASE = 0x8000;
 
-//                                                                16bits         12bits       3bits            3bits
 static DWORD IOCTL_XINPUT_GET_INFORMATION          = CTL_CODE(IOCTL_XINPUT_BASE, 0x800, METHOD_BUFFERED, FILE_READ_ACCESS);                     // 0x80006000
 static DWORD IOCTL_XINPUT_GET_CAPABILITIES         = CTL_CODE(IOCTL_XINPUT_BASE, 0x801, METHOD_BUFFERED, FILE_READ_ACCESS | FILE_WRITE_ACCESS); // 0x8000E004
 static DWORD IOCTL_XINPUT_GET_LED_STATE            = CTL_CODE(IOCTL_XINPUT_BASE, 0x802, METHOD_BUFFERED, FILE_READ_ACCESS | FILE_WRITE_ACCESS); // 0x8000E008
@@ -381,6 +509,7 @@ static DWORD IOCTL_XINPUT_WAIT_FOR_GUIDE_BUTTON    = CTL_CODE(IOCTL_XINPUT_BASE,
 static DWORD IOCTL_XINPUT_GET_BATTERY_INFORMATION  = CTL_CODE(IOCTL_XINPUT_BASE, 0x806, METHOD_BUFFERED, FILE_READ_ACCESS | FILE_WRITE_ACCESS); // 0x8000E018
 static DWORD IOCTL_XINPUT_POWER_DOWN_DEVICE        = CTL_CODE(IOCTL_XINPUT_BASE, 0x807, METHOD_BUFFERED, FILE_WRITE_ACCESS);                    // 0x8000A01C
 static DWORD IOCTL_XINPUT_GET_AUDIO_INFORMATION    = CTL_CODE(IOCTL_XINPUT_BASE, 0x808, METHOD_BUFFERED, FILE_READ_ACCESS | FILE_WRITE_ACCESS); // 0x8000E020
+static DWORD IOCTL_XINPUT_GET_BASE_BUS_INFORMATION = CTL_CODE(IOCTL_XINPUT_BASE, 0x8FF, METHOD_BUFFERED, FILE_READ_ACCESS | FILE_WRITE_ACCESS); // 0x8000E3FC
 
 namespace LEDState {
 
@@ -434,6 +563,49 @@ static BYTE XINPUT_LED_TO_PORT_MAP[] =
 }//namespace Protocol
 
 /////////////////////////////////////////////////////
+// XInputInternal namespace
+/////////////////////////////////////////////////////
+namespace XInputInternal {
+
+/////////////////////////////////////////////////////
+// XInputInternal::DeviceInfo namespace
+/////////////////////////////////////////////////////
+namespace DeviceInfo {
+
+namespace Enabled {
+    HRESULT GetState(DeviceInfo_t* pDevice, void* pParams, DWORD reserved);
+    HRESULT SetVibration(DeviceInfo_t* pDevice, void* pParams, DWORD reserved);
+}
+namespace Disabled {
+    HRESULT GetState(DeviceInfo_t* pDevice, void* pParams, DWORD reserved);
+    HRESULT SetVibration(DeviceInfo_t* pDevice, void* pParams, DWORD reserved);
+}
+
+DeviceInfo_t* Create(HANDLE hDevice, LPCWSTR lpDevicePath);
+void Destroy(DeviceInfo_t* pDevice);
+void Recycle(DeviceInfo_t* pDevice);
+
+BOOL IsDeviceInactive(DeviceInfo_t* pDevice);
+BOOL IsDeviceInactiveOnBus(DeviceInfo_t* pDevice);
+void OnEnableSettingChanged(BOOL bEnabled);
+bool MinFillFromInterface(HANDLE hDevice, DeviceInfo_t* pDevice);
+
+HRESULT GetKeystroke(DeviceInfo_t* pDevice, void* pParams, DWORD reserved);
+HRESULT PowerOffController(DeviceInfo_t* pDevice, void* pParams, DWORD reserved);
+HRESULT CancelGuideButtonWait(DeviceInfo_t* pDevice, void* pParams, DWORD reserved);
+HRESULT GetAudioDevice(DeviceInfo_t* pDevice, void* pParams, DWORD reserved);
+HRESULT GetBatteryInformation(DeviceInfo_t* pDevice, void* pParams, DWORD reserved);
+HRESULT GetCapabilities(DeviceInfo_t* pDevice, void* pParams, DWORD reserved);
+HRESULT GetBaseBusInformation(DeviceInfo_t* pDevice, void* pParams, DWORD reserved);
+HRESULT WaitForGuideButton(DeviceInfo_t* pDevice, void* pParams, DWORD reserved);
+
+static HRESULT(*g_pfnGetStateDispatcher)(DeviceInfo_t* pDevice, void* pParams, DWORD reserved);
+static HRESULT(*g_pfnSetVibrationDispatcher)(DeviceInfo_t* pDevice, void* pParams, DWORD reserved);
+
+}
+}
+
+/////////////////////////////////////////////////////
 // DeviceEnum namespace
 /////////////////////////////////////////////////////
 namespace DeviceEnum {
@@ -446,59 +618,9 @@ HRESULT GetDeviceOnPort(DWORD dwUserIndex, DeviceInfo_t** ppDevice, bool rescan)
 }
 
 /////////////////////////////////////////////////////
-// DeviceInfo namespace
+// XInputInternal::DeviceInfo namespace
 /////////////////////////////////////////////////////
-namespace DeviceInfo {
 
-struct XINPUT_AUDIO_INFORMATION
-{
-    WORD vendorId;
-    WORD productId;
-    BYTE inputId;
-};
-
-namespace Enabled {
-
-HRESULT GetState(DeviceInfo_t* pDevice, void* pParams, DWORD reserved);
-HRESULT SetVibration(DeviceInfo_t* pDevice, void* pParams, DWORD reserved);
-
-}
-
-namespace Disabled {
-
-HRESULT GetState(DeviceInfo_t* pDevice, void* pParams, DWORD reserved);
-HRESULT SetVibration(DeviceInfo_t* pDevice, void* pParams, DWORD reserved);
-
-}
-
-DeviceInfo_t* Create(HANDLE hDevice, LPCWSTR lpDevicePath);
-void Destroy(DeviceInfo_t* pDevice);
-void Recycle(DeviceInfo_t* pDevice);
-
-BOOL IsDeviceInactive(DeviceInfo_t* pDevice);
-
-HRESULT GetKeystroke(DeviceInfo_t* pDevice, void* pParams, DWORD reserved);
-HRESULT PowerOffController(DeviceInfo_t* pDevice, void* pParams, DWORD reserved);
-HRESULT CancelGuideButtonWait(DeviceInfo_t* pDevice, void* pParams, DWORD reserved);
-HRESULT GetAudioDeviceGuids(DeviceInfo_t* pDevice, void* pParams, DWORD reserved);
-HRESULT GetBatteryInformation(DeviceInfo_t* pDevice, void* pParams, DWORD reserved);
-HRESULT GetCapabilities(DeviceInfo_t* pDevice, void* pParams, DWORD reserved);
-HRESULT WaitForGuideButton(DeviceInfo_t* pDevice, void* pParams, DWORD reserved);
-
-void OnEnableSettingChanged(BOOL bEnabled);
-
-
-static HRESULT(*g_pfnGetStateDispatcher)(DeviceInfo_t* pDevice, void* pParams, DWORD reserved);
-static HRESULT(*g_pfnSetVibrationDispatcher)(DeviceInfo_t* pDevice, void* pParams, DWORD reserved);
-static HRESULT(*g_pfnGetKeystrokeDispatcher)(DeviceInfo_t* pDevice, void* pParams, DWORD reserved) = GetKeystroke;
-static HRESULT(*g_pfnPowerOffController)(DeviceInfo_t* pDevice, void* pParams, DWORD reserved) = PowerOffController;
-static HRESULT(*g_pfnCancelGuideButtonWait)(DeviceInfo_t* pDevice, void* pParams, DWORD reserved) = CancelGuideButtonWait;
-static HRESULT(*g_pfnGetAudioDeviceGuidsDispatcher)(DeviceInfo_t* pDevice, void* pParams, DWORD reserved) = GetAudioDeviceGuids;
-static HRESULT(*g_pfnGetBatteryInformationDispatcher)(DeviceInfo_t* pDevice, void* pParams, DWORD reserved) = GetBatteryInformation;
-static HRESULT(*g_pfnGetCapabilitiesDispatcher)(DeviceInfo_t* pDevice, void* pParams, DWORD reserved) = GetCapabilities;
-static HRESULT(*g_pfnWaitForGuideButton)(DeviceInfo_t* pDevice, void* pParams, DWORD reserved) = WaitForGuideButton;
-
-}
 
 /////////////////////////////////////////////////////
 // DeviceList namespace
@@ -506,13 +628,18 @@ static HRESULT(*g_pfnWaitForGuideButton)(DeviceInfo_t* pDevice, void* pParams, D
 namespace DeviceList {
 
 constexpr size_t InitialDeviceListSize = XUSER_MAX_COUNT * 2;
+constexpr size_t BusDeviceListSize = 16;
 
 HRESULT Initialize();
 HRESULT Close();
 
 HRESULT SetDeviceOnPort(DWORD dwUserIndex, DeviceInfo_t* pDevice);
 HRESULT GetDeviceOnPort(DWORD dwUserIndex, DeviceInfo_t** ppDevice);
+void RemoveBusDevice(DWORD dwBusIndex);
+
 HRESULT IsDevicePresent(DeviceInfo_t* pDevice);
+BYTE IsBusDevicePresent(DeviceInfo_t* pDevice);
+
 BOOL IsDeviceOnPort(DWORD dwUserIndex);
 
 }
@@ -530,9 +657,10 @@ HRESULT SendLEDState(DeviceInfo_t* pDevice, BYTE ledState);
 HRESULT SendDeviceVibration(DeviceInfo_t* pDevice);
 HRESULT GetDeviceInfoFromInterface(HANDLE hDevice, OutDeviceInfos_t* pDeviceInfos);
 HRESULT GetLatestDeviceInfo(DeviceInfo_t* pDevice);
-HRESULT GetCapabilities(DeviceInfo_t* pDevice, XINPUT_CAPABILITIES* pCapabilities);
+HRESULT GetCapabilities(DeviceInfo_t* pDevice, XINPUT_CAPABILITIES_EX* pCapabilitiesEx);
+HRESULT GetBaseBusInformation(DeviceInfo_t* pDevice, XINPUT_BASE_BUS_INFORMATION* pBaseBusInformation);
 HRESULT GetBatteryInformation(DeviceInfo_t* pDevice, BYTE DeviceType, XINPUT_BATTERY_INFORMATION* pBatteryInformation);
-HRESULT GetAudioDeviceInformation(DeviceInfo_t* pDevice, DeviceInfo::XINPUT_AUDIO_INFORMATION* pAudioInformation);
+HRESULT GetAudioDeviceInformation(DeviceInfo_t* pDevice, XINPUT_AUDIO_INFORMATION* pAudioInformation);
 HRESULT GetLEDState(DeviceInfo_t* pDevice, BYTE* ledState);
 HRESULT PowerOffController(DeviceInfo_t* pDevice);
 HRESULT WaitForGuideButton(HANDLE hDevice, DWORD dwUserIndex, XINPUT_LISTEN_STATE* pListenState);
@@ -540,10 +668,14 @@ HRESULT CancelGuideButtonWait(DeviceInfo_t* pDevice);
 
 namespace SetupDiWrapper {
 
-HDEVINFO GetClassDevs(const GUID* ClassGuid, PCWSTR Enumerator, HWND hwndParent, DWORD Flags);
-BOOL EnumDeviceInterfaces(HDEVINFO DeviceInfoSet, PSP_DEVINFO_DATA DeviceInfoData, const GUID* InterfaceClassGuid, DWORD MemberIndex, PSP_DEVICE_INTERFACE_DATA DeviceInterfaceData);
-BOOL GetDeviceInterfaceDetail(HDEVINFO DeviceInfoSet, PSP_DEVICE_INTERFACE_DATA DeviceInterfaceData, PSP_DEVICE_INTERFACE_DETAIL_DATA_W DeviceInterfaceDetailData, DWORD DeviceInterfaceDetailDataSize, PDWORD RequiredSize, PSP_DEVINFO_DATA DeviceInfoData);
-BOOL DestroyDeviceInfoList(HDEVINFO DeviceInfoSet);
+HANDLE CreateDeviceInfoList();
+
+BOOL GetClassDevs(HANDLE hDev, const GUID* pGuid, LPCWSTR pDeviceID, DWORD Flags);
+BOOL EnumDeviceInfo(HANDLE DeviceInfoSet, DWORD MemberIndex, PDO_DEVINFO_DATA DeviceInfoData);
+BOOL EnumDeviceInterfaces(HANDLE hDev, PDO_DEVINFO_DATA DeviceInfoData, const GUID* InterfaceClassGuid, DWORD MemberIndex, PDO_DEVICE_INTERFACE_DATA DeviceInterfaceData);
+BOOL GetDeviceInterfaceDetail(HANDLE DeviceInfoSet, PDO_DEVICE_INTERFACE_DATA DeviceInterfaceData, PDO_DEVICE_INTERFACE_DETAIL_DATA DeviceInterfaceDetailData, DWORD DeviceInterfaceDetailDataSize, PDWORD RequiredSize);
+BOOL DestroyDeviceInfoList(HANDLE hDeviceInfoList);
+BOOL GetDeviceProperty(HANDLE DeviceInfoSet, PDO_DEVINFO_DATA DeviceInfoData, CONST DEVPROPKEY* PropertyKey, DEVPROPTYPE* PropertyType, LPVOID PropertyBuffer, DWORD PropertyBufferSize, PDWORD RequiredSize);
 
 }
 
@@ -554,11 +686,10 @@ BOOL DestroyDeviceInfoList(HDEVINFO DeviceInfoSet);
 /////////////////////////////////////////////////////
 namespace Utilities {
 
-HRESULT Initialize();
-HRESULT Close();
-
-LPVOID MemAlloc(DWORD size);
+LPVOID MemAlloc(DWORD dwBytes);
 void MemFree(LPVOID lpMem);
+
+HANDLE OpenDevice(LPCWSTR DevicePath, DWORD dwFlagsAndAttributes);
 
 HRESULT SafeCopyToUntrustedBuffer(void* pDst, const void* pSrc, DWORD size);
 HRESULT SafeCopyFromUntrustedBuffer(void* pDst, const void* pSrc, DWORD size);
@@ -573,12 +704,27 @@ BOOL CheckForSettings(DWORD setting, LPVOID lpParam);
 /////////////////////////////////////////////////////
 namespace XInputCore {
 
+#ifndef OPENXINPUT_DISABLE_COM
+static IInputHostClient* g_InputHostClient = nullptr;
+#endif
+
+static HMODULE g_hXInputUapDll = nullptr;
+static INIT_ONCE g_InitOnce;
+
+static decltype(OpenXInputGetState)             * g_pfnXInputGetState_Override              = nullptr;
+static decltype(OpenXInputSetState)             * g_pfnXInputSetState_Override              = nullptr;
+static decltype(OpenXInputGetCapabilities)      * g_pfnXInputGetCapabilities_Override       = nullptr;
+static decltype(OpenXInputEnable)               * g_pfnXInputEnable_Override                = nullptr;
+static decltype(OpenXInputGetAudioDeviceIds)    * g_pfnXInputGetAudioDeviceIds_Override     = nullptr;
+static decltype(OpenXInputGetBatteryInformation)* g_pfnXInputGetBatteryInformation_Override = nullptr;
+static decltype(OpenXInputGetKeystroke)         * g_pfnXInputGetKeystroke_Override          = nullptr;
+
 BOOL Initialize();
-BOOL Close();
+BOOL Close(bool ContinueHost);
 
 HRESULT Enter();
 HRESULT Leave();
-HRESULT ProcessAPIRequest(DWORD dwUserIndex, HRESULT(*pfn_ApiAction)(DeviceInfo_t*, void*, DWORD), void* pApiParam, DWORD reserved);
+HRESULT ProcessAPIRequest(DWORD dwUserIndex, HRESULT(*pfn_ApiAction)(DeviceInfo_t*, void*, DWORD), void* pApiParam, DWORD reserved, BOOL bBusOnly);
 
 void EnableCommunications(BOOL bEnabled);
 
@@ -589,7 +735,7 @@ void EnableCommunications(BOOL bEnabled);
 /////////////////////////////////////////////////////
 class QuickDriverEnum
 {
-    HDEVINFO hDevInfo;
+    HANDLE hDevInfo;
     DWORD  MemberIndex;
     PSP_DEVICE_INTERFACE_DETAIL_DATA_W DeviceInterfaceDetailData;
     DWORD  DeviceInterfaceDetailDataSize;
@@ -605,10 +751,10 @@ public:
 
     ~QuickDriverEnum()
     {
-        if (hDevInfo != (HDEVINFO)INVALID_HANDLE_VALUE)
+        if (hDevInfo != INVALID_HANDLE_VALUE)
         {
             DriverComm::SetupDiWrapper::DestroyDeviceInfoList(hDevInfo);
-            hDevInfo = (HDEVINFO)INVALID_HANDLE_VALUE;
+            hDevInfo = INVALID_HANDLE_VALUE;
             MemberIndex = 0;
         }
         if (DeviceInterfaceDetailData != nullptr)
@@ -621,10 +767,12 @@ public:
 
     bool Restart()
     {
-        if (hDevInfo != (HDEVINFO)INVALID_HANDLE_VALUE)
+        HANDLE hDev;
+
+        if (hDevInfo != INVALID_HANDLE_VALUE)
         {
             DriverComm::SetupDiWrapper::DestroyDeviceInfoList(hDevInfo);
-            hDevInfo = (HDEVINFO)INVALID_HANDLE_VALUE;
+            hDevInfo = INVALID_HANDLE_VALUE;
         }
         MemberIndex = 0;
         if (DeviceInterfaceDetailData == nullptr)
@@ -639,8 +787,13 @@ public:
             }
         }
 
-        hDevInfo = DriverComm::SetupDiWrapper::GetClassDevs(&Protocol::XUSB_INTERFACE_CLASS_GUID, nullptr, nullptr, DIGCF_DEVICEINTERFACE | DIGCF_PRESENT);
-        return hDevInfo != (HDEVINFO)INVALID_HANDLE_VALUE;
+        hDev = DriverComm::SetupDiWrapper::CreateDeviceInfoList();
+
+        if (hDev == nullptr || hDev == INVALID_HANDLE_VALUE)
+            return false;
+
+        hDevInfo = hDev;
+        return DriverComm::SetupDiWrapper::GetClassDevs(hDevInfo, &Protocol::XUSB_INTERFACE_CLASS_GUID, nullptr, DIGCF_DEVICEINTERFACE | DIGCF_PRESENT);
     }
 
     bool GetNext(LPHANDLE phDevice)
@@ -658,57 +811,33 @@ public:
         ZeroMemory(&DeviceInterfaceData, sizeof(SP_DEVICE_INTERFACE_DATA));
         DeviceInterfaceData.cbSize = sizeof(SP_DEVICE_INTERFACE_DATA);
 
-        if (DriverComm::SetupDiWrapper::EnumDeviceInterfaces(hDevInfo, nullptr, &Protocol::XUSB_INTERFACE_CLASS_GUID, MemberIndex, &DeviceInterfaceData) == FALSE)
+        if (DriverComm::SetupDiWrapper::EnumDeviceInterfaces(hDevInfo, nullptr, &Protocol::XUSB_INTERFACE_CLASS_GUID, MemberIndex, (PDO_DEVICE_INTERFACE_DATA)&DeviceInterfaceData) == FALSE)
             return false;
 
         ++MemberIndex;
 
         DeviceInterfaceDetailData->cbSize = sizeof(SP_DEVICE_INTERFACE_DETAIL_DATA_W);
         RequiredSize = 0;
-        if (DriverComm::SetupDiWrapper::GetDeviceInterfaceDetail(hDevInfo, &DeviceInterfaceData, DeviceInterfaceDetailData, DeviceInterfaceDetailDataSize, &RequiredSize, nullptr) == TRUE)
+        if (DriverComm::SetupDiWrapper::GetDeviceInterfaceDetail(hDevInfo, (PDO_DEVICE_INTERFACE_DATA)&DeviceInterfaceData, (PDO_DEVICE_INTERFACE_DETAIL_DATA)DeviceInterfaceDetailData, DeviceInterfaceDetailDataSize, &RequiredSize) == FALSE)
         {
+            if (GetLastError() != ERROR_INSUFFICIENT_BUFFER)
+                return false;
 
-            *phDevice = CreateFileW(DeviceInterfaceDetailData->DevicePath, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
-            return true;
+            Utilities::MemFree(DeviceInterfaceDetailData);
+            DeviceInterfaceDetailDataSize = RequiredSize;
+            DeviceInterfaceDetailData = (PSP_DEVICE_INTERFACE_DETAIL_DATA_W)LocalAlloc(LMEM_ZEROINIT, DeviceInterfaceDetailDataSize);
+            if (DeviceInterfaceDetailData == nullptr)
+            {
+                DeviceInterfaceDetailDataSize = 0;
+                return false;
+            }
+
+            DeviceInterfaceDetailData->cbSize = sizeof(SP_DEVICE_INTERFACE_DETAIL_DATA_W);
+            if (DriverComm::SetupDiWrapper::GetDeviceInterfaceDetail(hDevInfo, (PDO_DEVICE_INTERFACE_DATA)&DeviceInterfaceData, (PDO_DEVICE_INTERFACE_DETAIL_DATA)DeviceInterfaceDetailData, DeviceInterfaceDetailDataSize, nullptr) == FALSE)
+                return false;
         }
 
-        if (GetLastError() != ERROR_INSUFFICIENT_BUFFER)
-            return false;
-
-        Utilities::MemFree(DeviceInterfaceDetailData);
-        DeviceInterfaceDetailDataSize = RequiredSize;
-        DeviceInterfaceDetailData = (PSP_DEVICE_INTERFACE_DETAIL_DATA_W)Utilities::MemAlloc(DeviceInterfaceDetailDataSize);
-        if (DeviceInterfaceDetailData == nullptr)
-        {
-            DeviceInterfaceDetailDataSize = 0;
-            return false;
-        }
-
-        DeviceInterfaceDetailData->cbSize = sizeof(SP_DEVICE_INTERFACE_DETAIL_DATA_W);
-        if (DriverComm::SetupDiWrapper::GetDeviceInterfaceDetail(hDevInfo, &DeviceInterfaceData, DeviceInterfaceDetailData, DeviceInterfaceDetailDataSize, nullptr, nullptr) == FALSE)
-            return false;
-
-        *phDevice = CreateFileW(DeviceInterfaceDetailData->DevicePath, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
-        return true;
-    }
-
-    bool MinFillFromInterface(HANDLE hDevice, DeviceInfo_t *pDevice)
-    {
-        OutDeviceInfos_t outBuff;
-
-        if (hDevice == INVALID_HANDLE_VALUE || pDevice == nullptr)
-            return false;
-
-        if (DriverComm::GetDeviceInfoFromInterface(hDevice, &outBuff) < 0 || (outBuff.unk2 & 0x80))
-            return false;
-
-        ZeroMemory(pDevice, sizeof(DeviceInfo_t));
-        pDevice->hDevice = hDevice;
-        pDevice->status = DEVICE_STATUS_ACTIVE;
-        pDevice->hGuideWait = INVALID_HANDLE_VALUE;
-        pDevice->wType = outBuff.wType;
-        pDevice->vendorId = outBuff.vendorId;
-        pDevice->productId = outBuff.productId;
+        *phDevice = Utilities::OpenDevice(DeviceInterfaceDetailData->DevicePath, FILE_ATTRIBUTE_NORMAL);
         return true;
     }
 };
@@ -718,6 +847,19 @@ public:
 /////////////////////////////////////////////////////
 DWORD Controller_GetUserKeystroke(DeviceInfo_t* pDevice, BYTE unk1, DWORD reserved, XINPUT_KEYSTROKE* pKeystroke);
 DWORD Controller_CalculateKeyFromThumbPos(SHORT base, SHORT X, SHORT Y);
+
+/////////////////////////////////////////////////////
+// Global functions
+/////////////////////////////////////////////////////
+HRESULT InitializeOverrides();
+void CleanupOverrides();
+void UnInitializeInputHost();
+
+void EventWriteDllLoaded(HRESULT hr);
+void EventWriteVidPid(WORD vendorId, WORD productId);
+
+HRESULT RegisterUtcEventProvider();
+void UnregisterUtcEventProvider();
 
 /////////////////////////////////////////////////////
 // Implementations
@@ -801,21 +943,70 @@ void CopyGamepadStateToDeviceInfo(DeviceInfo_t* pDevice, GamepadState0101* pGame
     pDevice->inputId = pGamepadState->inputId;
 }
 
-void TranslateCapabilities(GamepadCapabilities0101* pGamepadCapabilities, XINPUT_CAPABILITIES* pCapabilities)
+void TranslateCapabilities(DeviceInfo_t* pDevice, GamepadCapabilities0101* pGamepadCapabilities, XINPUT_CAPABILITIES_EX* pCapabilities)
 {
-    pCapabilities->Type = pGamepadCapabilities->Type;
-    pCapabilities->SubType = pGamepadCapabilities->SubType;
-    pCapabilities->Flags = XINPUT_CAPS_VOICE_SUPPORTED;
-    pCapabilities->Gamepad.wButtons = pGamepadCapabilities->wButtons;
-    pCapabilities->Gamepad.bLeftTrigger = pGamepadCapabilities->bLeftTrigger;
-    pCapabilities->Gamepad.bRightTrigger = pGamepadCapabilities->bRightTrigger;
-    pCapabilities->Gamepad.sThumbLX = pGamepadCapabilities->sThumbLX;
-    pCapabilities->Gamepad.sThumbLY = pGamepadCapabilities->sThumbLY;
-    pCapabilities->Gamepad.sThumbRX = pGamepadCapabilities->sThumbRX;
-    pCapabilities->Gamepad.sThumbRY = pGamepadCapabilities->sThumbRY;
-    pCapabilities->Vibration.wLeftMotorSpeed = pGamepadCapabilities->bLeftMotorSpeed;
-    pCapabilities->Vibration.wRightMotorSpeed = pGamepadCapabilities->bRightMotorSpeed;
-    pCapabilities->Gamepad.wButtons &= XINPUT_BUTTON_MASK;
+    pCapabilities->Capabilities.Type = (pGamepadCapabilities->Type != 0 ? XINPUT_DEVTYPE_GAMEPAD : 0);
+    pCapabilities->Capabilities.SubType = pGamepadCapabilities->SubType;
+    pCapabilities->Capabilities.Flags = XINPUT_CAPS_VOICE_SUPPORTED | XINPUT_CAPS_PMD_SUPPORTED;
+    pCapabilities->Capabilities.Gamepad.wButtons = pGamepadCapabilities->wButtons;
+    pCapabilities->Capabilities.Gamepad.bLeftTrigger = pGamepadCapabilities->bLeftTrigger;
+    pCapabilities->Capabilities.Gamepad.bRightTrigger = pGamepadCapabilities->bRightTrigger;
+    pCapabilities->Capabilities.Gamepad.sThumbLX = pGamepadCapabilities->sThumbLX;
+    pCapabilities->Capabilities.Gamepad.sThumbLY = pGamepadCapabilities->sThumbLY;
+    pCapabilities->Capabilities.Gamepad.sThumbRX = pGamepadCapabilities->sThumbRX;
+    pCapabilities->Capabilities.Gamepad.sThumbRY = pGamepadCapabilities->sThumbRY;
+    pCapabilities->Capabilities.Vibration.wLeftMotorSpeed = pGamepadCapabilities->bLeftMotorSpeed;
+    pCapabilities->Capabilities.Vibration.wRightMotorSpeed = pGamepadCapabilities->bRightMotorSpeed;
+    pCapabilities->Capabilities.Gamepad.wButtons &= XINPUT_BUTTON_MASK;
+    if (pDevice->vendorId != 0x45E || pDevice->productId != 0x719)
+    {
+        pCapabilities->ProductId = pDevice->productId;
+        pCapabilities->VendorId = pDevice->vendorId;
+    }
+    else
+    {
+        pCapabilities->Capabilities.Flags |= XINPUT_CAPS_WIRELESS;
+        pCapabilities->ProductId = 0;
+        pCapabilities->VendorId = 0;
+    }
+    pCapabilities->unk2 = 0;
+    pCapabilities->unk0 = 0;
+}
+
+void TranslateCapabilities(GamepadCapabilities0102* pGamepadCapabilities, XINPUT_CAPABILITIES_EX* pCapabilitiesEx)
+{
+    pCapabilitiesEx->Capabilities.Type = pGamepadCapabilities->Type;
+    pCapabilitiesEx->Capabilities.SubType = pGamepadCapabilities->SubType;
+    pCapabilitiesEx->Capabilities.Gamepad.wButtons = pGamepadCapabilities->wButtons;
+    pCapabilitiesEx->Capabilities.Gamepad.bLeftTrigger = pGamepadCapabilities->bLeftTrigger;
+    pCapabilitiesEx->Capabilities.Gamepad.bRightTrigger = pGamepadCapabilities->bRightTrigger;
+    pCapabilitiesEx->Capabilities.Gamepad.sThumbLX = pGamepadCapabilities->sThumbLX;
+    pCapabilitiesEx->Capabilities.Gamepad.sThumbLY = pGamepadCapabilities->sThumbLY;
+    pCapabilitiesEx->Capabilities.Gamepad.sThumbRX = pGamepadCapabilities->sThumbRX;
+    pCapabilitiesEx->Capabilities.Gamepad.sThumbRY = pGamepadCapabilities->sThumbRY;
+    pCapabilitiesEx->Capabilities.Vibration.wLeftMotorSpeed = pGamepadCapabilities->wLeftMotorSpeed;
+    pCapabilitiesEx->Capabilities.Vibration.wRightMotorSpeed = pGamepadCapabilities->wRightMotorSpeed;
+    pCapabilitiesEx->Capabilities.Gamepad.wButtons &= XINPUT_BUTTON_MASK;
+    pCapabilitiesEx->Capabilities.Flags = 0;
+    if (pGamepadCapabilities->Flags & 0x01)
+        pCapabilitiesEx->Capabilities.Flags |= XINPUT_CAPS_FFB_SUPPORTED;
+
+    if (pGamepadCapabilities->Flags & 0x02)
+        pCapabilitiesEx->Capabilities.Flags |= XINPUT_CAPS_WIRELESS;
+
+    if (pGamepadCapabilities->Flags & 0x04)
+        pCapabilitiesEx->Capabilities.Flags |= XINPUT_CAPS_VOICE_SUPPORTED;
+
+    if (pGamepadCapabilities->Flags & 0x08)
+        pCapabilitiesEx->Capabilities.Flags |= XINPUT_CAPS_PMD_SUPPORTED;
+
+    if (pGamepadCapabilities->Flags & 0x10)
+        pCapabilitiesEx->Capabilities.Flags |= XINPUT_CAPS_NO_NAVIGATION;
+
+    pCapabilitiesEx->VendorId = pGamepadCapabilities->vendorId;
+    pCapabilitiesEx->ProductId = pGamepadCapabilities->productId;
+    pCapabilitiesEx->unk0 = pGamepadCapabilities->unk2;
+    pCapabilitiesEx->unk2 = pGamepadCapabilities->unk3;
 }
 
 HRESULT SendReceiveIoctl(HANDLE hDevice, DWORD dwIoControlCode, LPVOID lpInBuffer, DWORD nInBufferSize, LPVOID lpOutBuffer, DWORD nOutBufferSize, LPOVERLAPPED lpOverlapped)
@@ -849,61 +1040,101 @@ HRESULT ReceiveIoctl(HANDLE hDevice, DWORD dwIoControlCode, LPVOID lpOutBuffer, 
 
 HRESULT EnumerateXInputDevices()
 {
-    HRESULT hr;
-    HDEVINFO hDeviceInfoSet;
-    DWORD dwMemberIndex = 0;
-    SP_DEVICE_INTERFACE_DATA DeviceInterfaceData;
-    PSP_DEVICE_INTERFACE_DETAIL_DATA_W pDeviceInterfaceDetailData;
     HANDLE hDevice;
+    HANDLE hDeviceInfoList;
+    DO_DEVICE_INTERFACE_DATA DevinfoData;
+    PDO_DEVICE_INTERFACE_DETAIL_DATA DevIfaceDetailData;
+    DWORD MemberIndex;
 
-    if ((hr = GetDeviceList(&hDeviceInfoSet)) < 0)
-        return hr;
-    
-    while (GetDeviceInterfaceData(hDeviceInfoSet, dwMemberIndex++, &DeviceInterfaceData) >= 0)
+    hDeviceInfoList = DriverComm::SetupDiWrapper::CreateDeviceInfoList();
+    if (hDeviceInfoList == nullptr || hDeviceInfoList == INVALID_HANDLE_VALUE)
+        return E_FAIL;
+
+    if (DriverComm::SetupDiWrapper::GetClassDevs(hDeviceInfoList, &Protocol::XUSB_INTERFACE_CLASS_GUID, nullptr, DIGCF_DEVICEINTERFACE | DIGCF_PRESENT) == FALSE)
     {
-        if ((hr = GetDeviceInterfaceDetail(hDeviceInfoSet, &DeviceInterfaceData, &pDeviceInterfaceDetailData)) < 0)
-            continue;
+        DriverComm::SetupDiWrapper::DestroyDeviceInfoList(hDeviceInfoList);
+        return E_FAIL;
+    }
 
-        hDevice = CreateFileW(pDeviceInterfaceDetailData->DevicePath, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
-        if (hDevice != INVALID_HANDLE_VALUE)
+    MemberIndex = 0;
+    while (1)
+    {
+        ZeroMemory(&DevinfoData, sizeof(DO_DEVICE_INTERFACE_DATA));
+        DevinfoData.cbSize = sizeof(DO_DEVICE_INTERFACE_DATA);
+        if (DriverComm::SetupDiWrapper::EnumDeviceInterfaces(hDeviceInfoList, nullptr, &Protocol::XUSB_INTERFACE_CLASS_GUID, MemberIndex++, &DevinfoData) == FALSE)
+            break;
+
+        if (GetDeviceInterfaceDetail(hDeviceInfoList, &DevinfoData, &DevIfaceDetailData) >= 0)
         {
-            hr = EnumerateDevicesOnDeviceInterface(hDevice, pDeviceInterfaceDetailData->DevicePath);
-            if (hr < 0)
-                hr = S_OK;
-
-            CloseHandle(hDevice);
-            hDevice = INVALID_HANDLE_VALUE;
+            hDevice = Utilities::OpenDevice(DevIfaceDetailData->DevicePath, FILE_ATTRIBUTE_NORMAL);
+            if (hDevice != INVALID_HANDLE_VALUE)
+            {
+                EnumerateDevicesOnDeviceInterface(hDevice, DevIfaceDetailData->DevicePath);
+                CloseHandle(hDevice);
+            }
         }
     }
 
-    if (hDeviceInfoSet != (HDEVINFO)INVALID_HANDLE_VALUE)
-    {
-        DriverComm::SetupDiWrapper::DestroyDeviceInfoList(hDeviceInfoSet);
-        hDeviceInfoSet = (HDEVINFO)INVALID_HANDLE_VALUE;
-    }
+    if (hDeviceInfoList != INVALID_HANDLE_VALUE)
+        DriverComm::SetupDiWrapper::DestroyDeviceInfoList(hDeviceInfoList);
 
-    return hr;
+    return S_OK;
 }
 
-HRESULT EnumerateDevicesOnDeviceInterface(HANDLE hDevice, LPCWSTR lpDevicePath)
+HRESULT EnumerateDevicesOnDeviceInterface(HANDLE hDevice, LPCWSTR DevicePath)
 {
     HRESULT hr;
     DeviceInfo_t* pDevice = nullptr;
     OutDeviceInfos_t deviceInfos = {};
+    DWORD busIndex;
 
     hr = DriverComm::GetDeviceInfoFromInterface(hDevice, &deviceInfos);
-    if (hr < 0 || (deviceInfos.unk3 & 0x80))
+    if (hr < 0)
         return hr;
 
+    if (deviceInfos.unk2 & 0x80)
+        return S_OK;
+
+    pDevice = XInputInternal::DeviceInfo::Create(hDevice, DevicePath);
+    if (pDevice == nullptr)
+        return E_OUTOFMEMORY;
+
+    pDevice->status |= DEVICE_STATUS_ACTIVE | DEVICE_STATUS_BUS_ACTIVE;
+    pDevice->productId = deviceInfos.productId;
+    pDevice->vendorId = deviceInfos.vendorId;
+    pDevice->wType = deviceInfos.wType;
+
+    busIndex = DeviceList::IsBusDevicePresent(pDevice);
+    if (busIndex == 255)
+    {
+        busIndex = 0;
+        while (g_pBusDeviceList[busIndex] != nullptr)
+        {
+            ++busIndex;
+            if (busIndex >= DeviceList::BusDeviceListSize)
+            {
+                XInputInternal::DeviceInfo::Destroy(pDevice);
+                return E_FAIL;
+            }
+        }
+        g_pBusDeviceList[busIndex] = pDevice;
+    }
+    else
+    {
+        XInputInternal::DeviceInfo::Destroy(pDevice);
+    }
+
+    // It has been inserted in the bus list or destroyed.
+    pDevice = nullptr;
     for (int i = 0; i < deviceInfos.deviceIndex; ++i)
     {
         if (pDevice != nullptr)
         {
-            DeviceInfo::Recycle(pDevice);
+            XInputInternal::DeviceInfo::Recycle(pDevice);
         }
         else
         {
-            pDevice = DeviceInfo::Create(hDevice, lpDevicePath);
+            pDevice = XInputInternal::DeviceInfo::Create(hDevice, DevicePath);
             if (pDevice == nullptr)
                 return E_OUTOFMEMORY;
         }
@@ -912,6 +1143,7 @@ HRESULT EnumerateDevicesOnDeviceInterface(HANDLE hDevice, LPCWSTR lpDevicePath)
         pDevice->productId = deviceInfos.productId;
         pDevice->vendorId = deviceInfos.vendorId;
         pDevice->wType = deviceInfos.wType;
+        pDevice->dwBusIndex = busIndex;
         hr = DriverComm::GetLatestDeviceInfo(pDevice);
         if (hr >= 0)
         {
@@ -926,7 +1158,7 @@ HRESULT EnumerateDevicesOnDeviceInterface(HANDLE hDevice, LPCWSTR lpDevicePath)
 
     if (pDevice)
     {
-        DeviceInfo::Destroy(pDevice);
+        XInputInternal::DeviceInfo::Destroy(pDevice);
         pDevice = nullptr;
     }
 
@@ -939,7 +1171,7 @@ HRESULT ProcessEnumeratedDevice(DeviceInfo_t* pDevice)
     HRESULT hr;
     BYTE LEDState;
 
-    if (DeviceInfo::IsDeviceInactive(pDevice) == TRUE)
+    if (XInputInternal::DeviceInfo::IsDeviceInactive(pDevice))
         return 1;
     
     hr = DeviceList::IsDevicePresent(pDevice);
@@ -989,52 +1221,57 @@ HRESULT ProcessEnumeratedDevice(DeviceInfo_t* pDevice)
     return S_OK;
 }
 
-HRESULT GetDeviceList(HDEVINFO* phDevInfo)
+HRESULT GetAudioInterfaceStringInfo(DeviceInfo_t* pDevice, WORD* VendorId, WORD* ProductId, BYTE* InputId)
 {
     HRESULT hr;
+    XINPUT_AUDIO_INFORMATION audioInformation;
 
-    *phDevInfo = DriverComm::SetupDiWrapper::GetClassDevs(&Protocol::XUSB_INTERFACE_CLASS_GUID, nullptr, nullptr, DIGCF_DEVICEINTERFACE | DIGCF_PRESENT);
-    if (*phDevInfo == (HDEVINFO)INVALID_HANDLE_VALUE)
-        hr = E_FAIL;
+    *VendorId = pDevice->vendorId;
+    *ProductId = pDevice->productId;
+    *InputId = static_cast<BYTE>(pDevice->inputId);
+    if (pDevice->wType >= 0x102)
+    {
+        if (DriverComm::GetAudioDeviceInformation(pDevice, &audioInformation) >= 0)
+        {
+            *VendorId = audioInformation.vendorId;
+            *ProductId = audioInformation.productId;
+            *InputId = audioInformation.inputId;
+            if (!(pDevice->inputId == 255))
+                return S_OK;
+        }
+    }
     else
-        hr = S_OK;
+    {
+        hr = DriverComm::GetLatestDeviceInfo(pDevice);
+        if (hr < 0)
+            return hr;
 
-    return hr;
+        if (!XInputInternal::DeviceInfo::IsDeviceInactive(pDevice))
+        {
+            *InputId = static_cast<BYTE>(pDevice->inputId);
+            return S_OK;
+        }
+    }
+
+    return E_FAIL;
 }
 
-HRESULT GetDeviceInterfaceData(HDEVINFO DeviceInfoSet, DWORD MemberIndex, PSP_DEVICE_INTERFACE_DATA DeviceInterfaceData)
-{
-    HRESULT hr;
-
-    ZeroMemory(DeviceInterfaceData, sizeof(SP_DEVICE_INTERFACE_DATA));
-    DeviceInterfaceData->cbSize = sizeof(SP_DEVICE_INTERFACE_DATA);
-    if (DriverComm::SetupDiWrapper::EnumDeviceInterfaces(DeviceInfoSet, nullptr, &Protocol::XUSB_INTERFACE_CLASS_GUID, MemberIndex, DeviceInterfaceData) == TRUE)
-        hr = S_OK;
-    else
-        hr = E_FAIL;
-
-    return hr;
-}
-
-HRESULT GetDeviceInterfaceDetail(HDEVINFO hDeviceInfo, PSP_DEVICE_INTERFACE_DATA DeviceInterfaceData, PSP_DEVICE_INTERFACE_DETAIL_DATA_W* ppDeviceInterfaceDetailData)
+HRESULT GetDeviceInterfaceDetail(HANDLE hDev, PDO_DEVICE_INTERFACE_DATA DeviceInterfaceData, PDO_DEVICE_INTERFACE_DETAIL_DATA* ppDeviceInterfaceDetailData)
 {
     DWORD uBytes = g_dwDetailBufferSize;
-    *ppDeviceInterfaceDetailData = (PSP_DEVICE_INTERFACE_DETAIL_DATA_W)g_pDetailBuffer;
+    *ppDeviceInterfaceDetailData = (PDO_DEVICE_INTERFACE_DETAIL_DATA)g_pDetailBuffer;
     if (*ppDeviceInterfaceDetailData)
     {
-        ZeroMemory(*ppDeviceInterfaceDetailData, g_dwDetailBufferSize);
-        (*ppDeviceInterfaceDetailData)->cbSize = sizeof(SP_DEVICE_INTERFACE_DETAIL_DATA_W);
+        memset(*ppDeviceInterfaceDetailData, 0, g_dwDetailBufferSize);
+        (*ppDeviceInterfaceDetailData)->cbSize = sizeof(DO_DEVICE_INTERFACE_DETAIL_DATA);
     }
-    if (DriverComm::SetupDiWrapper::GetDeviceInterfaceDetail(hDeviceInfo, DeviceInterfaceData, *ppDeviceInterfaceDetailData, g_dwDetailBufferSize, &uBytes, nullptr) == TRUE)
-    {
+
+    if (DriverComm::SetupDiWrapper::GetDeviceInterfaceDetail(hDev, DeviceInterfaceData, *ppDeviceInterfaceDetailData, g_dwDetailBufferSize, &uBytes) == TRUE)
         return S_OK;
-    }
 
     *ppDeviceInterfaceDetailData = nullptr;
     if (GetLastError() != ERROR_INSUFFICIENT_BUFFER)
-    {
         return E_FAIL;
-    }
 
     if (g_pDetailBuffer)
     {
@@ -1048,11 +1285,12 @@ HRESULT GetDeviceInterfaceDetail(HDEVINFO hDeviceInfo, PSP_DEVICE_INTERFACE_DATA
         return E_OUTOFMEMORY;
 
     g_dwDetailBufferSize = uBytes;
-    *ppDeviceInterfaceDetailData = (PSP_DEVICE_INTERFACE_DETAIL_DATA_W)g_pDetailBuffer;
 
-    (*ppDeviceInterfaceDetailData)->cbSize = sizeof(SP_DEVICE_INTERFACE_DETAIL_DATA_W);
-    if (DriverComm::SetupDiWrapper::GetDeviceInterfaceDetail(hDeviceInfo, DeviceInterfaceData, *ppDeviceInterfaceDetailData, g_dwDetailBufferSize, nullptr, nullptr) == FALSE)
+    *ppDeviceInterfaceDetailData = (PDO_DEVICE_INTERFACE_DETAIL_DATA)g_pDetailBuffer;
+    (*ppDeviceInterfaceDetailData)->cbSize = sizeof(DO_DEVICE_INTERFACE_DETAIL_DATA);
+    if (DriverComm::SetupDiWrapper::GetDeviceInterfaceDetail(hDev, DeviceInterfaceData, *ppDeviceInterfaceDetailData, g_dwDetailBufferSize, nullptr) == FALSE)
     {
+        *ppDeviceInterfaceDetailData = nullptr;
         return E_FAIL;
     }
 
@@ -1071,36 +1309,6 @@ DWORD CALLBACK WaitForGuideButtonHelper(void* pParam)
 
     Utilities::MemFree(pApiParam);
     return 0;
-}
-
-BOOL CALLBACK DirectSoundEnumerateCallback(PDSPROPERTY_DIRECTSOUNDDEVICE_DESCRIPTION_W_DATA lpData, LPVOID lpUser)
-{
-    DSoundCallbackParam_t* pParam = (DSoundCallbackParam_t*)lpUser;
-    size_t devicePathLen;
-
-    if (lpUser == nullptr)
-        return FALSE; // Stop enumeration.
-
-    if (lpData->Type != DIRECTSOUNDDEVICE_TYPE_WDM)
-        return TRUE; // Skip this device and continue enumeration.
-
-    devicePathLen = wcslen(pParam->DevicePath);
-    if (wcslen(lpData->Interface) < devicePathLen)
-        return TRUE; // Skip this device and continue enumeration.
-    
-    if (CopyMemory(lpData->Interface, pParam->DevicePath, devicePathLen * sizeof(WCHAR)) != 0)
-        return TRUE; // Skip this device and continue enumeration.
-
-    if (lpData->DataFlow == DIRECTSOUNDDEVICE_DATAFLOW_RENDER)
-    {
-        *pParam->HeadphoneGuid = lpData->DeviceId;
-    }
-    else if (lpData->DataFlow == DIRECTSOUNDDEVICE_DATAFLOW_CAPTURE)
-    {
-        *pParam->MicrophoneGuid = lpData->DeviceId;
-    }
-
-    return TRUE; // Continue enumeration.
 }
 
 class QuickModule
@@ -1133,6 +1341,222 @@ public:
     }
 };
 
+/////////////////////////////////////////////////////
+// DevQuery namespace
+/////////////////////////////////////////////////////
+namespace DevQuery {
+
+DevQuery_t* Create()
+{
+    DevQuery_t* result = nullptr;
+    
+    result = (DevQuery_t*)Utilities::MemAlloc(sizeof(DevQuery_t));
+    if (result == nullptr)
+        return nullptr;
+
+    result->hEvent = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+    if (result->hEvent == nullptr)
+    {
+        Utilities::MemFree(result);
+        return nullptr;
+    }
+
+    result->DeviceInterfaceId = XINPUT_PKEY_SWD_DeviceInterfaceId;
+    result->unk1 = nullptr;
+    result->unk2 = nullptr;
+    result->lpDeviceId = nullptr;
+    result->lpuiDeviceIdCount = nullptr;
+
+    return result;
+}
+
+void Destroy(DevQuery_t* pDevQuery)
+{
+    if (pDevQuery != nullptr)
+    {
+        if (pDevQuery->hEvent != nullptr)
+        {
+            CloseHandle(pDevQuery->hEvent);
+            pDevQuery->hEvent = nullptr;
+        }
+        Utilities::MemFree(pDevQuery);
+    }
+}
+
+HRESULT RenderQuery(DevQuery_t* pDeviceQuery, GUID DeviceGuid, int a3, LPWSTR lpDeviceId, UINT* lpuiDeviceIdCount)
+{
+    HRESULT result;
+    HDEVQUERY hQuery;
+    DEV_QUERY_PARAM DeviceQueryParam;
+
+    DeviceQueryParam.unk1 = 0x100000;
+    memset(&DeviceQueryParam.unk2, 0, sizeof(DeviceQueryParam.unk2));
+    DeviceQueryParam.unk3 = (void*)2;
+    DeviceQueryParam.DevPropKeyContainerId = XINPUT_DEVPKEY_Device_ContainerId;
+    DeviceQueryParam.unk4 = 0;
+    DeviceQueryParam.unk5 = 0;
+    DeviceQueryParam.unk6 = 13;
+    DeviceQueryParam.unk8 = &DeviceGuid;
+    DeviceQueryParam.unk7 = 16;
+    DeviceQueryParam.unk9 = (void*)2;
+    DeviceQueryParam.DevPropKeyClassGuid = XINPUT_DEVPKEY_DeviceInterface_ClassGuid;
+    DeviceQueryParam.unk10 = 0;
+    DeviceQueryParam.unk11 = 0;
+    DeviceQueryParam.unk12 = 13;
+    DeviceQueryParam.unk13 = 16;
+    DeviceQueryParam.pQueryGUID = &XINPUT_DEVINTERFACE_AUDIO_RENDER;
+    DeviceQueryParam.unk14 = 0x200000;
+    memset(&DeviceQueryParam.unk15, 0, sizeof(DeviceQueryParam.unk15));
+    ResetEvent(pDeviceQuery->hEvent);
+    pDeviceQuery->lpDeviceId = lpDeviceId;
+    pDeviceQuery->lpuiDeviceIdCount = lpuiDeviceIdCount;
+    result = DevCreateObjectQuery(
+        1,
+        1,
+        1,
+        &pDeviceQuery->DeviceInterfaceId,
+        4,
+        &DeviceQueryParam,
+        &DevQueryCallbackProc,
+        pDeviceQuery,
+        &hQuery);
+    if (result >= 0)
+        result = WaitForSingleObject(pDeviceQuery->hEvent, 10000) != 0 ? E_FAIL : S_OK;
+    if (hQuery)
+        DevCloseObjectQuery(hQuery);
+
+    pDeviceQuery->lpDeviceId = nullptr;
+    pDeviceQuery->lpuiDeviceIdCount = nullptr;
+    return result;
+}
+
+HRESULT CaptureQuery(DevQuery_t* pDeviceQuery, GUID DeviceGuid, int a3, LPWSTR lpDeviceId, UINT* lpuiDeviceIdCount)
+{
+    HRESULT result;
+    HDEVQUERY hQuery;
+    DEV_QUERY_PARAM DeviceQueryParam;
+
+    DeviceQueryParam.unk1 = 0x100000;
+    memset(&DeviceQueryParam.unk2, 0, sizeof(DeviceQueryParam.unk2));
+    DeviceQueryParam.unk3 = (void*)2;
+    DeviceQueryParam.DevPropKeyContainerId = XINPUT_DEVPKEY_Device_ContainerId;
+    DeviceQueryParam.unk4 = 0;
+    DeviceQueryParam.unk5 = 0;
+    DeviceQueryParam.unk6 = 13;
+    DeviceQueryParam.unk8 = &DeviceGuid;
+    DeviceQueryParam.unk7 = 16;
+    DeviceQueryParam.unk9 = (void*)2;
+    DeviceQueryParam.DevPropKeyClassGuid = XINPUT_DEVPKEY_DeviceInterface_ClassGuid;
+    DeviceQueryParam.unk10 = 0;
+    DeviceQueryParam.unk11 = 0;
+    DeviceQueryParam.unk12 = 13;
+    DeviceQueryParam.unk13 = 16;
+    DeviceQueryParam.pQueryGUID = &XINPUT_DEVINTERFACE_AUDIO_CAPTURE;
+    DeviceQueryParam.unk14 = 0x200000;
+    memset(&DeviceQueryParam.unk15, 0, sizeof(DeviceQueryParam.unk15));
+    ResetEvent(pDeviceQuery->hEvent);
+    pDeviceQuery->lpDeviceId = lpDeviceId;
+    pDeviceQuery->lpuiDeviceIdCount = lpuiDeviceIdCount;
+    result = DevCreateObjectQuery(
+        1,
+        1,
+        1,
+        &pDeviceQuery->DeviceInterfaceId,
+        4,
+        &DeviceQueryParam,
+        &DevQueryCallbackProc,
+        pDeviceQuery,
+        &hQuery);
+    if (result >= 0)
+        result = WaitForSingleObject(pDeviceQuery->hEvent, 10000) != 0 ? E_FAIL : S_OK;
+    if (hQuery)
+        DevCloseObjectQuery(hQuery);
+
+    pDeviceQuery->lpDeviceId = nullptr;
+    pDeviceQuery->lpuiDeviceIdCount = nullptr;
+    return result;
+}
+
+void CALLBACK DevQueryCallbackProc(HDEVQUERY hQuery, LPVOID _pUserParam, PDEV_QUERY_RESULT_ACTION_DATA pCallbackData)
+{
+    size_t Length;
+    size_t CopySize;
+
+    DevQuery_t* pUserParam = (DevQuery_t*)_pUserParam;
+
+    if (pCallbackData == nullptr || pUserParam == nullptr)
+        return;
+    
+    if (pCallbackData->bUnk1 == TRUE)
+    {
+        if (pUserParam->lpuiDeviceIdCount != nullptr)
+        {
+            LPCWSTR lpDeviceId = (LPCWSTR)pCallbackData->lpvUnk3;
+            if (lpDeviceId != nullptr)
+            {
+                Length = wcslen(lpDeviceId) + 1;
+                if (pUserParam->lpDeviceId)
+                {
+                    CopySize = *pUserParam->lpuiDeviceIdCount;
+                    if (Length < *pUserParam->lpuiDeviceIdCount)
+                        CopySize = Length;
+                    memcpy(pUserParam->lpDeviceId, lpDeviceId, 2 * CopySize);
+                }
+                *pUserParam->lpuiDeviceIdCount = Length;
+                pUserParam->lpuiDeviceIdCount = nullptr;
+            }
+        }
+    }
+    else if (pCallbackData->bUnk1 == FALSE)
+    {
+        SetEvent(pUserParam->hEvent);
+    }
+}
+
+} // namespace DevQuery
+
+/////////////////////////////////////////////////////
+// DevQuery namespace
+/////////////////////////////////////////////////////
+namespace DeviceProperty {
+
+LPVOID* CreateInstance(HANDLE hDev, SP_XINPUTINFO_DATA* unk1, const DEVPROPKEY* lpPropertyKey)
+{
+    DEVPROPTYPE PropType = {};
+    DWORD RequiredSize;
+
+    LPVOID* ppDeviceInstance = (LPVOID*)Utilities::MemAlloc(sizeof(LPVOID));
+    if (ppDeviceInstance == nullptr)
+        return nullptr;
+
+    RequiredSize = 0;
+    DriverComm::SetupDiWrapper::GetDeviceProperty(hDev, (PDO_DEVINFO_DATA)unk1, lpPropertyKey, &PropType, nullptr, 0, &RequiredSize);
+
+    *ppDeviceInstance = (LPVOID)Utilities::MemAlloc(RequiredSize == 0 ? sizeof(WCHAR) : RequiredSize);
+    if (*ppDeviceInstance == nullptr)
+    {
+        DeviceProperty::DestroyInstance(ppDeviceInstance);
+        return nullptr;
+    }
+
+    if (DriverComm::SetupDiWrapper::GetDeviceProperty(hDev, (PDO_DEVINFO_DATA)unk1, lpPropertyKey, &PropType, *ppDeviceInstance, RequiredSize, nullptr) == FALSE)
+    {
+        DeviceProperty::DestroyInstance(ppDeviceInstance);
+        return nullptr;
+    }
+
+    return ppDeviceInstance;
+}
+
+void DestroyInstance(LPVOID* ppInstance)
+{
+    Utilities::MemFree(*ppInstance);
+    *ppInstance = nullptr;
+    Utilities::MemFree(ppInstance);
+}
+
+} // namespace DeviceProperty
+
 }
 
 /////////////////////////////////////////////////////
@@ -1151,7 +1575,7 @@ HRESULT Close()
 {
     if (g_pDetailBuffer)
     {
-        ((HLOCAL)g_pDetailBuffer);
+        Utilities::MemFree(g_pDetailBuffer);
         g_pDetailBuffer = nullptr;
     }
     
@@ -1180,10 +1604,10 @@ HRESULT GetDeviceOnPort(DWORD dwUserIndex, DeviceInfo_t** ppDevice, bool rescan)
 }
 
 /////////////////////////////////////////////////////
-// DeviceInfo namespace
+// XInputInternal::DeviceInfo namespace
 /////////////////////////////////////////////////////
-namespace DeviceInfo { 
-
+namespace XInputInternal { 
+namespace DeviceInfo {
 namespace Enabled {
 
 HRESULT GetState(DeviceInfo_t* pDevice, void* pParams, DWORD reserved)
@@ -1260,7 +1684,7 @@ DeviceInfo_t* Create(HANDLE hDevice, LPCWSTR lpDevicePath)
     DeviceInfo_t* pDevice;
 
     pDevice = (DeviceInfo_t*)Utilities::MemAlloc(sizeof(DeviceInfo_t));
-    if (pDevice)
+    if (pDevice != nullptr)
     {
         // Shouldn't be needed
         ZeroMemory(pDevice, sizeof(DeviceInfo_t));
@@ -1270,7 +1694,7 @@ DeviceInfo_t* Create(HANDLE hDevice, LPCWSTR lpDevicePath)
         if (DuplicateHandle(hSourceProcessHandle, hDevice, hSourceProcessHandle, &pDevice->hDevice, 0, FALSE, DUPLICATE_SAME_ACCESS))
         {
             pDevice->dwDevicePathSize = wcslen(lpDevicePath) + 1;
-            pDevice->lpDevicePath = (LPWSTR)Utilities::MemAlloc(pDevice->dwDevicePathSize * sizeof(WCHAR));
+            pDevice->lpDevicePath = (LPWSTR)Utilities::MemAlloc((pDevice->dwDevicePathSize + 1) * sizeof(WCHAR));
             if (pDevice->lpDevicePath)
             {
                 if (StringCchCopyW(pDevice->lpDevicePath, pDevice->dwDevicePathSize, lpDevicePath) >= 0)
@@ -1279,7 +1703,7 @@ DeviceInfo_t* Create(HANDLE hDevice, LPCWSTR lpDevicePath)
         }
     }
 
-    if (pDevice)
+    if (pDevice != nullptr)
     {
         if (pDevice->lpDevicePath)
             Utilities::MemFree(pDevice->lpDevicePath);
@@ -1317,15 +1741,55 @@ void Recycle(DeviceInfo_t* pDevice)
 
     HANDLE hDevice = pDevice->hDevice;
     LPWSTR lpDevicePath = pDevice->lpDevicePath;
-    ZeroMemory(pDevice, sizeof(DeviceInfo_t));
+    memset(pDevice, 0, sizeof(DeviceInfo_t));
     pDevice->hDevice = hDevice;
     pDevice->hGuideWait = INVALID_HANDLE_VALUE;
     pDevice->lpDevicePath = lpDevicePath;
+    pDevice->dwBusIndex = 255;
 }
 
 BOOL IsDeviceInactive(DeviceInfo_t* pDevice)
 {
     return (pDevice->status & DEVICE_STATUS_ACTIVE) == 0;
+}
+
+BOOL IsDeviceInactiveOnBus(DeviceInfo_t* pDevice)
+{
+    return (pDevice->status & DEVICE_STATUS_BUS_ACTIVE) == 0;
+}
+
+void OnEnableSettingChanged(BOOL bEnabled)
+{
+    if (bEnabled)
+    {
+        g_pfnGetStateDispatcher = Enabled::GetState;
+        g_pfnSetVibrationDispatcher = Enabled::SetVibration;
+    }
+    else
+    {
+        g_pfnGetStateDispatcher = Disabled::GetState;
+        g_pfnSetVibrationDispatcher = Disabled::SetVibration;
+    }
+}
+
+bool MinFillFromInterface(HANDLE hDevice, DeviceInfo_t* pDevice)
+{
+    OutDeviceInfos_t outBuff;
+
+    if (hDevice == INVALID_HANDLE_VALUE || pDevice == nullptr)
+        return false;
+
+    if (DriverComm::GetDeviceInfoFromInterface(hDevice, &outBuff) < 0 || (outBuff.unk2 & 0x80))
+        return false;
+
+    ZeroMemory(pDevice, sizeof(DeviceInfo_t));
+    pDevice->hDevice = hDevice;
+    pDevice->status = DEVICE_STATUS_ACTIVE;
+    pDevice->hGuideWait = INVALID_HANDLE_VALUE;
+    pDevice->wType = outBuff.wType;
+    pDevice->vendorId = outBuff.vendorId;
+    pDevice->productId = outBuff.productId;
+    return true;
 }
 
 HRESULT GetKeystroke(DeviceInfo_t* pDevice, void* pParams, DWORD reserved)
@@ -1353,90 +1817,110 @@ HRESULT CancelGuideButtonWait(DeviceInfo_t* pDevice, void* pParams, DWORD reserv
     return DriverComm::CancelGuideButtonWait(pDevice);
 }
 
-HRESULT GetAudioDeviceGuids(DeviceInfo_t* pDevice, void* pParams, DWORD reserved)
+HRESULT GetAudioDevice(DeviceInfo_t* pDevice, void* pParams, DWORD reserved)
 {
-    GetAudioDeviceGuidsApiParam_t* pApiParam = (GetAudioDeviceGuidsApiParam_t*)pParams;
     HRESULT hr;
-    DWORD vendorId;
-    DWORD productId;
-    DWORD inputId;
+    GetAudioDeviceIdApiParam_t* pApiParam = (GetAudioDeviceIdApiParam_t*)pParams;
+    WCHAR StrDeviceId[56];
+    HANDLE hDev;
+    WORD VendorId;
+    WORD ProductId;
+    BYTE InputId;
+    DWORD MemberIndex;
+    DevQuery::DevQuery_t* pDevQuery;
+    SP_XINPUTINFO_DATA DevInfoData;
+    GUID DeviceGuid;
+    LPVOID* ppDeviceData;
 
-    IClassFactory* pClassFactory;
-    IKsPropertySet* pIKsPropertySet;
-
-    WCHAR devicePath[64];
-
-    DSoundCallbackParam_t CallbackData;
-    DSPROPERTY_DIRECTSOUNDDEVICE_ENUMERATE_W_DATA EnumerateData;
-
-    XINPUT_AUDIO_INFORMATION AudioInformation;
-
-    ZeroMemory(pApiParam->pHeadphoneGuid, sizeof(GUID));
-    ZeroMemory(pApiParam->pMicrophoneGuid, sizeof(GUID));
-
-    if (IsDeviceInactive(pDevice))
-        return E_FAIL;
-
-    vendorId = pDevice->vendorId;
-    productId = pDevice->productId;
-    inputId = pDevice->inputId;
-    if (pDevice->wType >= 0x0102)
+    if (pApiParam->pRenderDeviceId != nullptr)
     {
-        if (DriverComm::GetAudioDeviceInformation(pDevice, &AudioInformation) < 0)
-            return E_FAIL;
-
-        vendorId = AudioInformation.vendorId;
-        productId = AudioInformation.productId;
-        inputId = AudioInformation.inputId;
-        
-        if (pDevice->inputId == 0xFF)
-            return E_FAIL;
+        *pApiParam->pRenderDeviceId = L'\0';
     }
-    else
+    else if (pApiParam->pRenderCount != nullptr)
     {
-        if((hr = DriverComm::GetLatestDeviceInfo(pDevice)) < 0)
-            return hr;
-
-        if (IsDeviceInactive(pDevice))
-            return E_FAIL;
-
-        inputId = pDevice->inputId;
-        if (pDevice->inputId == 0xFF)
-            return S_OK;
+        *pApiParam->pRenderCount = 0;
+    }
+    if (pApiParam->pCaptureDeviceId != nullptr)
+    {
+        *pApiParam->pCaptureDeviceId = L'\0';
+    }
+    else if (pApiParam->pCaptureCount != nullptr)
+    {
+        *pApiParam->pCaptureCount = 0;
     }
 
-    QuickModule quickModule(L"dsound.dll");
-    if (!quickModule.IsValid())
+    if (XInputInternal::DeviceInfo::IsDeviceInactive(pDevice))
         return E_FAIL;
 
-    DllGetClassObject_t* pfn_DllGetClassObject = (DllGetClassObject_t*)quickModule.GetFunctionPointer("DllGetClassObject");
-    if (pfn_DllGetClassObject == nullptr)
-        return E_FAIL;
-
-    if (StringCchPrintfW(devicePath, sizeof(devicePath)/sizeof(*devicePath), L"\\\\?\\USB#VID_%04X&PID_%04X&IA_%02X", vendorId, productId, inputId) < 0)
-        return E_FAIL;
-
-    if ((hr = pfn_DllGetClassObject(&XINPUT_CLSID_DirectSoundPrivate, &XINPUT_IID_IClassFactory, (LPVOID*)&pClassFactory)) < 0)
-        return hr;
-
-    pIKsPropertySet = nullptr;
-    hr = pClassFactory->CreateInstance(pClassFactory, XINPUT_IID_IKsPropertySet, (LPVOID*)&pIKsPropertySet);
-    pClassFactory->Release();
-    pClassFactory = nullptr;
-
+    hr = GetAudioInterfaceStringInfo(pDevice, &VendorId, &ProductId, &InputId);
     if (hr < 0)
         return hr;
 
-    CallbackData.DevicePath = devicePath;
-    CallbackData.HeadphoneGuid = pApiParam->pHeadphoneGuid;
-    CallbackData.MicrophoneGuid = pApiParam->pMicrophoneGuid;
+    if (InputId == 255)
+        return S_OK;
 
-    EnumerateData.Callback = &DirectSoundEnumerateCallback;
-    EnumerateData.Context = &CallbackData;
-    hr = pIKsPropertySet->Get(XINPUT_DSPROPSETID_DirectSoundDevice, 8, nullptr, 0, (LPVOID)&EnumerateData, sizeof(DSPROPERTY_DIRECTSOUNDDEVICE_ENUMERATE_W_DATA), nullptr);
+    if (StringCchPrintfW(StrDeviceId, sizeof(StrDeviceId)/sizeof(*StrDeviceId), L"USB\\VID_%04X&PID_%04X&IA_%02X", VendorId, ProductId, InputId) < 0)
+        return E_FAIL;
 
-    pIKsPropertySet->Release();
-    pIKsPropertySet = nullptr;
+    hDev = DriverComm::SetupDiWrapper::CreateDeviceInfoList();
+    if (hDev == nullptr || hDev == INVALID_HANDLE_VALUE)
+        return E_FAIL;
+
+    if (DriverComm::SetupDiWrapper::GetClassDevs(hDev, &XINPUT_GUID_DEVCLASS_MEDIA, StrDeviceId, DIGCF_PRESENT) == FALSE)
+    {
+        DriverComm::SetupDiWrapper::DestroyDeviceInfoList(hDev);
+        return E_FAIL;
+    }
+
+    MemberIndex = 0;
+    while (1)
+    {
+        DevInfoData.cbSize = sizeof(SP_XINPUTINFO_DATA);
+        if (DriverComm::SetupDiWrapper::EnumDeviceInfo(hDev, MemberIndex++, (PDO_DEVINFO_DATA)&DevInfoData) == FALSE)
+            break;
+
+        ppDeviceData = DeviceProperty::CreateInstance(hDev, &DevInfoData, &XINPUT_DEVPKEY_Device_InstanceId);
+        if (ppDeviceData != nullptr)
+        {
+            LPCWSTR pDevicePath = (LPCWSTR)*ppDeviceData;
+            bool match;
+            DWORD PathLength = wcslen(pDevicePath);
+            match = (PathLength >= 27 && _wcsnicmp(pDevicePath, StrDeviceId, 27) == 0);
+            DeviceProperty::DestroyInstance(ppDeviceData);
+
+            if (match)
+            {
+                ppDeviceData = DeviceProperty::CreateInstance(hDev, &DevInfoData, &XINPUT_DEVPKEY_Device_ContainerId);
+                if (ppDeviceData != nullptr)
+                {
+                    DeviceGuid = *(GUID*)*ppDeviceData;
+                    DeviceProperty::DestroyInstance(ppDeviceData);
+                    hr = S_OK;
+                }
+                else
+                {
+                    hr = E_FAIL;
+                }
+                break;
+            }
+        }
+    }
+
+    DriverComm::SetupDiWrapper::DestroyDeviceInfoList(hDev);
+    pDevQuery = DevQuery::Create();
+    if (pDevQuery == nullptr)
+        hr = E_OUTOFMEMORY;
+
+    if (pApiParam->pRenderCount != nullptr && hr >= 0)
+    {
+        hr = DevQuery::RenderQuery(pDevQuery, DeviceGuid, 0, pApiParam->pRenderDeviceId, pApiParam->pRenderCount);
+    }
+    if (pApiParam->pCaptureCount != nullptr && hr >= 0)
+    {
+        hr = DevQuery::CaptureQuery(pDevQuery, DeviceGuid, 0, pApiParam->pCaptureDeviceId, pApiParam->pCaptureCount);
+    }
+
+    DevQuery::Destroy(pDevQuery);
 
     return hr;
 }
@@ -1459,6 +1943,16 @@ HRESULT GetCapabilities(DeviceInfo_t* pDevice, void* pParams, DWORD reserved)
         return E_FAIL;
 
     return DriverComm::GetCapabilities(pDevice, pApiParam->pCapabilities);
+}
+
+HRESULT GetBaseBusInformation(DeviceInfo_t* pDevice, void* pParams, DWORD reserved)
+{
+    GetBaseBusInformationApiParam_t* pApiParam = (GetBaseBusInformationApiParam_t*)pParams;
+
+    if (IsDeviceInactive(pDevice) || IsDeviceInactiveOnBus(pDevice))
+        return E_FAIL;
+
+    return DriverComm::GetBaseBusInformation(pDevice, pApiParam->pBaseBusInformation);
 }
 
 HRESULT WaitForGuideButton(DeviceInfo_t* pDevice, void* pParams, DWORD reserved)
@@ -1521,21 +2015,8 @@ HRESULT WaitForGuideButton(DeviceInfo_t* pDevice, void* pParams, DWORD reserved)
     return hr;
 }
 
-void OnEnableSettingChanged(BOOL bEnabled)
-{
-    if (bEnabled)
-    {
-        g_pfnGetStateDispatcher = Enabled::GetState;
-        g_pfnSetVibrationDispatcher = Enabled::SetVibration;
-    }
-    else
-    {
-        g_pfnGetStateDispatcher = Disabled::GetState;
-        g_pfnSetVibrationDispatcher = Disabled::SetVibration;
-    }
-}
-
-}
+}//namespace DeviceInfo
+}//namespace XInputInternal
 
 /////////////////////////////////////////////////////
 // DeviceList namespace
@@ -1546,17 +2027,35 @@ HRESULT Initialize()
 {
     g_dwDeviceListSize = 0;
     g_pDeviceList = (DeviceInfo_t**)Utilities::MemAlloc(InitialDeviceListSize * sizeof(DeviceInfo_t*));
-    if (!g_pDeviceList)
+    if (g_pDeviceList == nullptr)
         return E_FAIL;
     
     g_dwDeviceListSize = InitialDeviceListSize;
+    g_pBusDeviceList = (DeviceInfo_t**)Utilities::MemAlloc(BusDeviceListSize * sizeof(DeviceInfo_t*));
+    if (g_pBusDeviceList == nullptr)
+    {
+        g_dwDeviceListSize = 0;
+        Utilities::MemFree(g_pDeviceList);
+        g_pDeviceList = nullptr;
+        return E_FAIL;
+    }
+
     return S_OK;
 }
 
 HRESULT Close()
 {
-    if (g_dwDeviceListSize == 0 || g_pDeviceList == nullptr)
+    if (g_dwDeviceListSize == 0 || g_pDeviceList == nullptr || g_pBusDeviceList == nullptr)
         return E_FAIL;
+
+    for (int i = 0; i < BusDeviceListSize; ++i)
+    {
+        if (g_pBusDeviceList[i] != nullptr)
+        {
+            XInputInternal::DeviceInfo::Destroy(g_pBusDeviceList[i]);
+            g_pBusDeviceList[i] = nullptr;
+        }
+    }
 
     for (DWORD i = 0; i < g_dwDeviceListSize; ++i)
     {
@@ -1584,13 +2083,15 @@ HRESULT Close()
             }
         }
 
-        DeviceInfo::Destroy(*ppDevice);
+        XInputInternal::DeviceInfo::Destroy(*ppDevice);
         *ppDevice = nullptr;
     }
 
     Utilities::MemFree(g_pDeviceList);
+    Utilities::MemFree(g_pBusDeviceList);
     g_pDeviceList = nullptr;
     g_dwDeviceListSize = 0;
+    g_pBusDeviceList = nullptr;
     return S_OK;
 }
 
@@ -1618,7 +2119,7 @@ HRESULT RemoveDeviceFromPort(DWORD dwUserIndex)
 
     if (g_pDeviceList[dwUserIndex] != nullptr)
     {
-        DeviceInfo::Destroy(g_pDeviceList[dwUserIndex]);
+        XInputInternal::DeviceInfo::Destroy(g_pDeviceList[dwUserIndex]);
         g_pDeviceList[dwUserIndex] = nullptr;
     }
 
@@ -1631,8 +2132,41 @@ HRESULT GetDeviceOnPort(DWORD dwUserIndex, DeviceInfo_t** ppDevice)
     return S_OK;
 }
 
+void RemoveBusDevice(DWORD dwBusIndex)
+{
+    DeviceInfo_t* pDevice;
+
+    if (dwBusIndex > BusDeviceListSize)
+        return;
+
+    if (g_pBusDeviceList[dwBusIndex] == nullptr)
+        return;
+
+    if (g_dwDeviceListSize)
+    {
+        for (DWORD i = 0; i < g_dwDeviceListSize; ++i)
+        {
+            pDevice = g_pDeviceList[i];
+            if (pDevice != nullptr && pDevice->dwBusIndex == dwBusIndex)
+            {
+                pDevice->status &= ~DEVICE_STATUS_ACTIVE;
+                pDevice->dwBusIndex = 255;
+            }
+        }
+    }
+
+    XInputInternal::DeviceInfo::Destroy(g_pBusDeviceList[dwBusIndex]);
+    g_pBusDeviceList[dwBusIndex] = nullptr;
+}
+
 HRESULT IsDevicePresent(DeviceInfo_t* pDevice)
 {
+    if (!XInputInternal::DeviceInfo::IsDeviceInactiveOnBus(pDevice))
+        return E_NOTIMPL;
+
+    if (g_dwDeviceListSize == 0)
+        return 1;
+
     for (DWORD i = 0; i < g_dwDeviceListSize; ++i)
     {
         if (g_pDeviceList[i] != nullptr &&
@@ -1646,6 +2180,32 @@ HRESULT IsDevicePresent(DeviceInfo_t* pDevice)
     }
 
     return 1;
+}
+
+BYTE IsBusDevicePresent(DeviceInfo_t* pDevice)
+{
+    DeviceInfo_t* pBusDevice;
+
+    if(XInputInternal::DeviceInfo::IsDeviceInactiveOnBus(pDevice))
+        return 255;
+
+    int i;
+    for(i = 0; i < BusDeviceListSize; ++i)
+    {
+        pBusDevice = g_pBusDeviceList[i];
+        if (pBusDevice)
+        {
+            if (pBusDevice->lpDevicePath != nullptr || pDevice->lpDevicePath != nullptr)
+            {
+                if (wcscmp(pBusDevice->lpDevicePath, pDevice->lpDevicePath) == 0)
+                    break;
+            }
+        }
+    }
+    if (i >= BusDeviceListSize)
+        return 255;
+
+    return i;
 }
 
 BOOL IsDeviceOnPort(DWORD dwUserIndex)
@@ -1667,8 +2227,10 @@ HRESULT Initialize()
 {
     g_pfnDeviceIoControl = nullptr;
     g_pfnGetClassDevs = nullptr;
+    g_pfnEnumDeviceInfo = nullptr;
     g_pfnEnumDeviceInterfaces = nullptr;
     g_pfnGetDeviceInterfaceDetail = nullptr;
+    g_pfnGetDeviceProperty = nullptr;
     g_pfnDestroyDeviceInfoList = nullptr;
     return S_OK;
 }
@@ -1747,6 +2309,42 @@ BOOL CheckForDriverHook(DWORD driverHook, LPVOID hookFunction)
             g_pfnDestroyDeviceInfoList = nullptr;
             break;
 
+        case 0xBAAD000B:
+            //if(dword_410C24 & 8 && g_dwLogVerbosity >= 4)
+                // Log
+            g_pfnCreateDeviceInfoList = (decltype(g_pfnCreateDeviceInfoList))hookFunction;;
+            break;
+
+        case 0xBAAD000C:
+            //if(dword_410C24 & 8 && g_dwLogVerbosity >= 4)
+                // Log
+            g_pfnCreateDeviceInfoList = nullptr;
+            break;
+
+        case 0xBAAD000D:
+            //if(dword_410C24 & 8 && g_dwLogVerbosity >= 4)
+                // Log
+            g_pfnEnumDeviceInfo = (decltype(g_pfnEnumDeviceInfo))hookFunction;;
+            break;
+
+        case 0xBAAD000E:
+            //if(dword_410C24 & 8 && g_dwLogVerbosity >= 4)
+                // Log
+            g_pfnEnumDeviceInfo = nullptr;
+            break;
+
+        case 0xBAAD000F:
+            //if(dword_410C24 & 8 && g_dwLogVerbosity >= 4)
+                // Log
+            g_pfnGetDeviceProperty = (decltype(g_pfnGetDeviceProperty))hookFunction;;
+            break;
+
+        case 0xBAAD0010:
+            //if(dword_410C24 & 8 && g_dwLogVerbosity >= 4)
+                // Log
+            g_pfnGetDeviceProperty = nullptr;
+            break;
+
     }
 
     return TRUE;
@@ -1785,7 +2383,7 @@ HRESULT GetDeviceInfoFromInterface(HANDLE hDevice, OutDeviceInfos_t* pDeviceInfo
     hr = ReceiveIoctl(hDevice, Protocol::IOCTL_XINPUT_GET_INFORMATION, pDeviceInfos, sizeof(OutDeviceInfos_t));
     if (hr >= 0)
         hr = S_OK;
-    
+
     return hr;
 }
 
@@ -1839,7 +2437,7 @@ HRESULT GetLatestDeviceInfo(DeviceInfo_t* pDevice)
     return S_OK;
 }
 
-HRESULT GetCapabilities(DeviceInfo_t* pDevice, XINPUT_CAPABILITIES* pCapabilities)
+HRESULT GetCapabilities(DeviceInfo_t* pDevice, XINPUT_CAPABILITIES_EX* pCapabilitiesEx)
 {
     static XINPUT_CAPABILITIES s_GamepadCapabilities = {
         XINPUT_DEVTYPE_GAMEPAD            , // Type
@@ -1860,19 +2458,78 @@ HRESULT GetCapabilities(DeviceInfo_t* pDevice, XINPUT_CAPABILITIES* pCapabilitie
         }
     };
     HRESULT hr;
-    InGamepadCapabilities0101 InBuffer;
-    GamepadCapabilities0101 OutBuffer;
 
     if (pDevice->wType == 0x0100)
-        return Utilities::SafeCopyToUntrustedBuffer(pCapabilities, &s_GamepadCapabilities, sizeof(XINPUT_CAPABILITIES));
+    {
+        hr = Utilities::SafeCopyToUntrustedBuffer(&pCapabilitiesEx->Capabilities, &s_GamepadCapabilities, sizeof(XINPUT_CAPABILITIES));
+        pCapabilitiesEx->VendorId = pDevice->vendorId;
+        pCapabilitiesEx->ProductId = pDevice->productId;
+        pCapabilitiesEx->unk2 = 0;
+        pCapabilitiesEx->unk0 = 0;
+    }
+    else if (pDevice->wType == 0x0101)
+    {
+        InGamepadCapabilities0101 InBuffer;
+        GamepadCapabilities0101 OutBuffer;
 
-    InBuffer.wType = 0x0101;
-    InBuffer.DeviceIndex = pDevice->dwUserIndex;
-    ZeroMemory(&OutBuffer, sizeof(GamepadCapabilities0101));
+        InBuffer.wType = 0x0101;
+        InBuffer.DeviceIndex = pDevice->dwUserIndex;
+        ZeroMemory(&OutBuffer, sizeof(GamepadCapabilities0101));
 
-    hr = SendReceiveIoctl(pDevice->hDevice, Protocol::IOCTL_XINPUT_GET_CAPABILITIES, &InBuffer, sizeof(InGamepadCapabilities0101), &OutBuffer, sizeof(GamepadCapabilities0101), nullptr);
-    if (hr >= 0)
-        TranslateCapabilities(&OutBuffer, pCapabilities);
+        hr = SendReceiveIoctl(pDevice->hDevice, Protocol::IOCTL_XINPUT_GET_CAPABILITIES, &InBuffer, sizeof(InGamepadCapabilities0101), &OutBuffer, sizeof(GamepadCapabilities0101), nullptr);
+        if (hr >= 0)
+            TranslateCapabilities(pDevice, &OutBuffer, pCapabilitiesEx);
+    }
+    else
+    {
+        InGamepadCapabilities0101 InBuffer;
+        GamepadCapabilities0102 OutBuffer = {};
+
+        InBuffer.wType = 0x102;
+        InBuffer.DeviceIndex = pDevice->dwUserIndex;
+        hr = SendReceiveIoctl(pDevice->hDevice, Protocol::IOCTL_XINPUT_GET_CAPABILITIES, &InBuffer, sizeof(InGamepadCapabilities0101), &OutBuffer, sizeof(GamepadCapabilities0102), 0);
+        if (hr >= 0)
+            TranslateCapabilities(&OutBuffer, pCapabilitiesEx);
+    }
+    
+
+    return hr;
+}
+
+HRESULT GetBaseBusInformation(DeviceInfo_t* pDevice, XINPUT_BASE_BUS_INFORMATION* pBaseBusInformation)
+{
+    HRESULT hr;
+    InBaseBusInformation InBuffer;
+    OutBaseBusInformation OutBuffer;
+
+    ZeroMemory(pBaseBusInformation, sizeof(XINPUT_BASE_BUS_INFORMATION));
+    pBaseBusInformation->vendorId = pDevice->vendorId;
+    pBaseBusInformation->productId = pDevice->productId;
+
+    if (pDevice->wType < 0x0103)
+        return S_OK;
+
+    ZeroMemory(&InBuffer, sizeof(InBaseBusInformation));
+    ZeroMemory(&OutBuffer, sizeof(OutBaseBusInformation));
+
+    hr = SendReceiveIoctl(pDevice->hDevice, Protocol::IOCTL_XINPUT_GET_BASE_BUS_INFORMATION, &InBuffer, sizeof(InBaseBusInformation), &OutBuffer, sizeof(OutBaseBusInformation), nullptr);
+    if (hr < 0)
+        return hr;
+
+    if (OutBuffer.field_2 != 0)
+        return E_NOTIMPL;
+
+    pBaseBusInformation->vendorId = OutBuffer.vendorId;
+    pBaseBusInformation->productId = OutBuffer.productId;
+    pBaseBusInformation->inputId = OutBuffer.inputId;
+
+    if (OutBuffer.field_1D != 0)
+    {
+        pBaseBusInformation->field_8 = OutBuffer.field_21 | ((OutBuffer.field_20 | ((OutBuffer.field_1F | (OutBuffer.field_1E << 8)) << 8)) << 8);
+        pBaseBusInformation->field_C = OutBuffer.field_22;
+        pBaseBusInformation->field_D = OutBuffer.field_23;
+        pBaseBusInformation->field_E = static_cast<BYTE>(OutBuffer.field_24);
+    }
 
     return hr;
 }
@@ -1885,9 +2542,9 @@ HRESULT GetBatteryInformation(DeviceInfo_t* pDevice, BYTE DeviceType, XINPUT_BAT
     InGamepadBatteryInformation0102 InBuffer;
     GamepadBatteryInformation0102 OutBuffer;
     XINPUT_BATTERY_INFORMATION BatteryInformation;
-    GetAudioDeviceGuidsApiParam_t apiParam;
-    GUID HeadphoneGuid;
-    GUID MicrophoneGuid;
+    GetAudioDeviceIdApiParam_t apiParam;
+    UINT RenderCount;
+    int v7;
 
     if (pDevice->wType >= 0x102u)
     {
@@ -1910,9 +2567,14 @@ HRESULT GetBatteryInformation(DeviceInfo_t* pDevice, BYTE DeviceType, XINPUT_BAT
 
         if (DeviceType == XINPUT_DEVTYPE_GAMEPAD)
         {
-            apiParam.pHeadphoneGuid = &HeadphoneGuid;
-            apiParam.pMicrophoneGuid = &MicrophoneGuid;
-            if (DeviceInfo::g_pfnGetAudioDeviceGuidsDispatcher(pDevice, &apiParam, 2) < 0 || IsEqualGUID(HeadphoneGuid, null_guid) != 0)
+            v7 = 0;
+            apiParam.pRenderDeviceId = nullptr;
+            apiParam.pRenderCount = &RenderCount;
+            apiParam.pCaptureDeviceId = nullptr;
+            apiParam.pCaptureCount = nullptr;
+
+            RenderCount = 0;
+            if (XInputInternal::DeviceInfo::GetAudioDevice(pDevice, &apiParam, 4) < 0 || RenderCount == 0)
             {
                 BatteryInformation.BatteryType = BATTERY_TYPE_DISCONNECTED;
                 BatteryInformation.BatteryLevel = BATTERY_LEVEL_EMPTY;
@@ -1923,7 +2585,7 @@ HRESULT GetBatteryInformation(DeviceInfo_t* pDevice, BYTE DeviceType, XINPUT_BAT
     return hr;
 }
 
-HRESULT GetAudioDeviceInformation(DeviceInfo_t* pDevice, DeviceInfo::XINPUT_AUDIO_INFORMATION* pAudioInformation)
+HRESULT GetAudioDeviceInformation(DeviceInfo_t* pDevice, XINPUT_AUDIO_INFORMATION* pAudioInformation)
 {
     HRESULT hr;
     InGetAudioDeviceInformation_t InBuffer;
@@ -1999,7 +2661,7 @@ HRESULT WaitForGuideButton(HANDLE hDevice, DWORD dwUserIndex, XINPUT_LISTEN_STAT
     inBuffer.wType = 0x0102;
     inBuffer.DeviceIndex = (BYTE)dwUserIndex;
 
-    ZeroMemory(&outBuffer, sizeof(OutWaitForGuideButtonBuffer_t));
+    memset(&outBuffer, 0, sizeof(OutWaitForGuideButtonBuffer_t));
 
     hr = SendReceiveIoctl(hDevice, Protocol::IOCTL_XINPUT_WAIT_FOR_GUIDE_BUTTON, &inBuffer, sizeof(InWaitForGuideButtonBuffer_t), &outBuffer, sizeof(OutWaitForGuideButtonBuffer_t), &overlapped);
     if (hr < 0 && hr != E_PENDING)
@@ -2063,36 +2725,60 @@ HRESULT CancelGuideButtonWait(DeviceInfo_t* pDevice)
 
 namespace SetupDiWrapper {
 
-HDEVINFO GetClassDevs(const GUID* ClassGuid, PCWSTR Enumerator, HWND hwndParent, DWORD Flags)
+HANDLE CreateDeviceInfoList()
+{
+    if (g_pfnCreateDeviceInfoList != nullptr)
+        return g_pfnCreateDeviceInfoList(nullptr, nullptr, nullptr, nullptr, nullptr);
+
+    return DevObjCreateDeviceInfoList(nullptr, nullptr, nullptr, nullptr, nullptr);
+}
+
+BOOL GetClassDevs(HANDLE hDev, const GUID* pGuid, LPCWSTR pDeviceID, DWORD Flags)
 {
     if (g_pfnGetClassDevs)
-        return g_pfnGetClassDevs(ClassGuid, Enumerator, hwndParent, Flags);
+        return g_pfnGetClassDevs(hDev, pGuid, pDeviceID, Flags, nullptr, 0);
 
-    return SetupDiGetClassDevsW(ClassGuid, Enumerator, hwndParent, Flags);
+    return DevObjGetClassDevs(hDev, pGuid, pDeviceID, Flags, nullptr, 0);
 }
 
-BOOL EnumDeviceInterfaces(HDEVINFO DeviceInfoSet, PSP_DEVINFO_DATA DeviceInfoData, const GUID* InterfaceClassGuid, DWORD MemberIndex, PSP_DEVICE_INTERFACE_DATA DeviceInterfaceData)
+BOOL EnumDeviceInfo(HANDLE DeviceInfoSet, DWORD MemberIndex, PDO_DEVINFO_DATA DeviceInfoData)
+{
+    if (g_pfnEnumDeviceInfo)
+        return g_pfnEnumDeviceInfo(DeviceInfoSet, MemberIndex, DeviceInfoData);
+
+    return DevObjEnumDeviceInfo(DeviceInfoSet, MemberIndex, DeviceInfoData);
+}
+
+BOOL EnumDeviceInterfaces(HANDLE hDev, PDO_DEVINFO_DATA DeviceInfoData, const GUID* InterfaceClassGuid, DWORD MemberIndex, PDO_DEVICE_INTERFACE_DATA DeviceInterfaceData)
 {
     if (g_pfnEnumDeviceInterfaces)
-        return g_pfnEnumDeviceInterfaces(DeviceInfoSet, DeviceInfoData, InterfaceClassGuid, MemberIndex, DeviceInterfaceData);
+        return g_pfnEnumDeviceInterfaces(hDev, nullptr, &Protocol::XUSB_INTERFACE_CLASS_GUID, MemberIndex, DeviceInterfaceData);
 
-    return SetupDiEnumDeviceInterfaces(DeviceInfoSet, DeviceInfoData, InterfaceClassGuid, MemberIndex, DeviceInterfaceData);
+    return DevObjEnumDeviceInterfaces(hDev, nullptr, &Protocol::XUSB_INTERFACE_CLASS_GUID, MemberIndex, DeviceInterfaceData);
 }
 
-BOOL GetDeviceInterfaceDetail(HDEVINFO DeviceInfoSet, PSP_DEVICE_INTERFACE_DATA DeviceInterfaceData, PSP_DEVICE_INTERFACE_DETAIL_DATA_W DeviceInterfaceDetailData, DWORD DeviceInterfaceDetailDataSize, PDWORD RequiredSize, PSP_DEVINFO_DATA DeviceInfoData)
+BOOL GetDeviceInterfaceDetail(HANDLE hDev, PDO_DEVICE_INTERFACE_DATA DeviceInterfaceData, PDO_DEVICE_INTERFACE_DETAIL_DATA DeviceInterfaceDetailData, DWORD DeviceInterfaceDetailDataSize, PDWORD RequiredSize)
 {
     if (g_pfnGetDeviceInterfaceDetail)
-        return g_pfnGetDeviceInterfaceDetail(DeviceInfoSet, DeviceInterfaceData, DeviceInterfaceDetailData, DeviceInterfaceDetailDataSize, RequiredSize, DeviceInfoData);
+        return g_pfnGetDeviceInterfaceDetail(hDev, DeviceInterfaceData, DeviceInterfaceDetailData, DeviceInterfaceDetailDataSize, RequiredSize, nullptr);
 
-    return SetupDiGetDeviceInterfaceDetailW(DeviceInfoSet, DeviceInterfaceData, DeviceInterfaceDetailData, DeviceInterfaceDetailDataSize, RequiredSize, DeviceInfoData);;
+    return DevObjGetDeviceInterfaceDetail(hDev, DeviceInterfaceData, DeviceInterfaceDetailData, DeviceInterfaceDetailDataSize, RequiredSize, nullptr);
 }
 
-BOOL DestroyDeviceInfoList(HDEVINFO DeviceInfoSet)
+BOOL DestroyDeviceInfoList(HANDLE hDeviceInfoList)
 {
     if (g_pfnDestroyDeviceInfoList )
-        return g_pfnDestroyDeviceInfoList(DeviceInfoSet);
+        return g_pfnDestroyDeviceInfoList(hDeviceInfoList);
     
-    return SetupDiDestroyDeviceInfoList(DeviceInfoSet);
+    return DevObjDestroyDeviceInfoList(hDeviceInfoList);
+}
+
+BOOL GetDeviceProperty(HANDLE DeviceInfoSet, PDO_DEVINFO_DATA DeviceInfoData, CONST DEVPROPKEY* PropertyKey, DEVPROPTYPE* PropertyType, LPVOID PropertyBuffer, DWORD PropertyBufferSize, PDWORD RequiredSize)
+{
+    if (g_pfnGetDeviceProperty)
+        return g_pfnGetDeviceProperty(DeviceInfoSet, DeviceInfoData, PropertyKey, PropertyType, PropertyBuffer, PropertyBufferSize, RequiredSize, 0);
+
+    return DevObjGetDeviceProperty(DeviceInfoSet, DeviceInfoData, PropertyKey, PropertyType, PropertyBuffer, PropertyBufferSize, RequiredSize, 0);
 }
 
 }//namespace SetupDiWrapper
@@ -2104,28 +2790,37 @@ BOOL DestroyDeviceInfoList(HDEVINFO DeviceInfoSet)
 /////////////////////////////////////////////////////
 namespace Utilities {
 
-HRESULT Initialize()
+LPVOID MemAlloc(DWORD dwBytes)
 {
-    g_dwSettings = SET_USER_LED_ON_CREATE | DISABLE_USER_LED_ON_DESTROY | DISABLE_VIBRATION_ON_DESTROY;
-    return S_OK;
-}
-
-HRESULT Close()
-{
-    return S_OK;
-}
-
-LPVOID MemAlloc(DWORD size)
-{
-    return LocalAlloc(LMEM_ZEROINIT, size);
+    return HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, dwBytes);
 }
 
 void MemFree(LPVOID lpMem)
 {
     if (lpMem != nullptr)
     {
-        LocalFree(lpMem);
+        HeapFree(GetProcessHeap(), 0, lpMem);
     }
+}
+
+HANDLE OpenDevice(LPCWSTR DevicePath, DWORD dwFlagsAndAttributes)
+{
+    HANDLE hDevice;
+
+#ifndef OPENXINPUT_DISABLE_COM
+    IXInputDevice* pComXInput;
+    if (CoCreateInstance(CLSID_DeviceBroker, nullptr, CLSCTX_INPROC_SERVER, GUID_8604b268_34a6_4b1a_a59f_cdbd8379fd98, (LPVOID*)&pComXInput) >= 0)
+    {
+        pComXInput->CreateFileW(DevicePath, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, dwFlagsAndAttributes, &hDevice);
+        pComXInput->Release();
+    }
+    else
+#endif
+    {
+        hDevice = CreateFileW(DevicePath, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, dwFlagsAndAttributes, nullptr);
+    }
+
+    return hDevice;
 }
 
 HRESULT SafeCopyToUntrustedBuffer(void* pDst, const void* pSrc, DWORD size)
@@ -2188,29 +2883,77 @@ BOOL Initialize()
 {
     InitializeCriticalSection(&g_csGlobalLock);
 
-    if (Utilities::Initialize() < 0)
-        return FALSE;
+    g_dwSettings = SET_USER_LED_ON_CREATE | DISABLE_USER_LED_ON_DESTROY | DISABLE_VIBRATION_ON_DESTROY;
 
     if (DeviceList::Initialize() < 0)
+        return FALSE;
+
+    g_pDetailBuffer = 0;
+    g_dwDetailBufferSize = 0;
+    g_pfnDeviceIoControl = nullptr;
+    g_pfnGetClassDevs = nullptr;
+    g_pfnEnumDeviceInfo = nullptr;
+    g_pfnEnumDeviceInterfaces = nullptr;
+    g_pfnGetDeviceInterfaceDetail = nullptr;
+    g_pfnGetDeviceProperty = nullptr;
+    g_pfnDestroyDeviceInfoList = nullptr;
+
+    if (InitializeOverrides() < 0)
     {
-        Utilities::Close();
+        CleanupOverrides();
         return FALSE;
     }
 
-    if (DeviceEnum::Initialize() < 0)
+    QueueUserWorkItem([](LPVOID lpUser) -> DWORD
     {
-        DeviceList::Close();
-        Utilities::Close();
-        return FALSE;
-    }
-
-    if (DriverComm::Initialize() < 0)
-    {
-        DeviceEnum::Close();
-        DeviceList::Close();
-        Utilities::Close();
-        return FALSE;
-    }
+        InitOnceExecuteOnce(&g_InitOnce, [](PINIT_ONCE InitOnce, PVOID Parameter, PVOID* Context) -> BOOL
+        {
+#ifndef OPENXINPUT_DISABLE_COM
+            //DWORD v0; // ebx
+            //int v1; // edi
+            //struct IInputHostClient* v2; // ecx
+            //int v4; // [esp+8h] [ebp-8h]
+            //struct IInputHostClient* v5; // [esp+Ch] [ebp-4h]
+            //
+            //v0 = 0;
+            //v4 = 0;
+            //v5 = 0;
+            //v1 = CreateInputHostForProcess(&v4);
+            //if (v1 < 0)
+            //    goto LABEL_14;
+            //v1 = CreateGenericInputHost(&XInputCore::g_XInputInputClient, &v5);
+            //if (v1 < 0
+            //    || v5->unk2(0x10000),
+            //        v1 = (*(int(__thiscall**)(int, struct IInputHostClient*))(*(_DWORD*)v4 + 12))(v4, v5),
+            //        v1 < 0))
+            //{
+            //    v2 = v5;
+            //}
+            //else
+            //{
+            //    v2 = 0;
+            //    XInputCore::g_InputHostClient = v5;
+            //    v5 = 0;
+            //}
+            //if (v2)
+            //{
+            //    v2->Release();
+            //    v5 = 0;
+            //}
+            //if (v1 < 0)
+            //{
+            //LABEL_14:
+            //    v0 = (unsigned __int16)v1;
+            //    if ((v1 & 0x1FFF0000) != 0x70000)
+            //        v0 = v1;
+            //}
+            //SetLastError(v0);
+            //return v1 >= 0;
+#endif
+            return TRUE;
+        }, nullptr, nullptr);
+        return GetLastError();
+    }, nullptr, 0);
 
     EnableCommunications(TRUE);
     g_IsInitialized = TRUE;
@@ -2218,15 +2961,20 @@ BOOL Initialize()
     return TRUE;
 }
 
-BOOL Close()
+BOOL Close(bool ContinueHost)
 {
     g_IsInitialized = FALSE;
     EnableCommunications(FALSE);
 
-    Utilities::Close();
+    if (!ContinueHost)
+        UnInitializeInputHost();
+
     DeviceList::Close();
     DeviceEnum::Close();
     DriverComm::Close();
+
+    UnregisterUtcEventProvider();
+    CleanupOverrides();
 
     DeleteCriticalSection(&g_csGlobalLock);
     return TRUE;
@@ -2250,7 +2998,7 @@ HRESULT Leave()
     return S_OK;
 }
 
-HRESULT ProcessAPIRequest(DWORD dwUserIndex, HRESULT(*pfn_ApiAction)(DeviceInfo_t*, void*, DWORD), void* pApiParam, DWORD reserved)
+HRESULT ProcessAPIRequest(DWORD dwUserIndex, HRESULT(*pfn_ApiAction)(DeviceInfo_t*, void*, DWORD), void* pApiParam, DWORD reserved, BOOL bBusOnly)
 {
     HRESULT hr;
     DeviceInfo_t* pDevice = nullptr;
@@ -2266,9 +3014,16 @@ HRESULT ProcessAPIRequest(DWORD dwUserIndex, HRESULT(*pfn_ApiAction)(DeviceInfo_
 
     do
     {
-        hr = DeviceEnum::GetDeviceOnPort(dwUserIndex, &pDevice, g_IsCommunicationEnabled);
-        if (hr < 0)
-            break;
+        if (bBusOnly == TRUE)
+        {
+            pDevice = g_pBusDeviceList[dwUserIndex];
+        }
+        else
+        {
+            hr = DeviceEnum::GetDeviceOnPort(dwUserIndex, &pDevice, g_IsCommunicationEnabled);
+            if (hr < 0)
+                break;
+        }
 
         if (pDevice == nullptr)
         {
@@ -2285,11 +3040,15 @@ HRESULT ProcessAPIRequest(DWORD dwUserIndex, HRESULT(*pfn_ApiAction)(DeviceInfo_
             pDevice->status &= ~DEVICE_STATUS_ACTIVE;
         }
 
-        if (!DeviceInfo::IsDeviceInactive(pDevice))
+        if (!XInputInternal::DeviceInfo::IsDeviceInactive(pDevice))
             break;
 
         pDevice = nullptr;
-        hr = DeviceList::RemoveDeviceFromPort(dwUserIndex);
+        DeviceList::RemoveBusDevice(dwUserIndex);
+        if (bBusOnly == FALSE)
+        {
+            hr = DeviceList::RemoveDeviceFromPort(dwUserIndex);
+        }
 
         if (hr < 0)
         {
@@ -2319,16 +3078,17 @@ void EnableCommunications(BOOL bEnabled)
         return;
 
     g_IsCommunicationEnabled = bEnabled;
-    DeviceInfo::OnEnableSettingChanged(bEnabled);
+    
+    XInputInternal::DeviceInfo::OnEnableSettingChanged(bEnabled);
 
     for (DWORD dwUserIndex = 0; dwUserIndex < XUSER_MAX_COUNT; ++dwUserIndex)
     {
         pDevice = nullptr;
-        if (DeviceEnum::GetDeviceOnPort(dwUserIndex, &pDevice, false) >= 0 && pDevice != nullptr)
+        if (DeviceEnum::GetDeviceOnPort(dwUserIndex, &pDevice, 0) >= 0 && pDevice != nullptr)
         {
             SetStateApiParam_t apiParam;
             apiParam.pVibration = nullptr;
-            DeviceInfo::g_pfnSetVibrationDispatcher(pDevice, &apiParam, 1);
+            XInputInternal::DeviceInfo::g_pfnSetVibrationDispatcher(pDevice, &apiParam, 1);
         }
     }
 }
@@ -2352,7 +3112,7 @@ DWORD Controller_GetUserKeystroke(DeviceInfo_t* pDevice, BYTE bUserIndex, DWORD 
     DWORD dwTickCount;
 
     apiParam.pState = &gamepadState;
-    if (DeviceInfo::g_pfnGetStateDispatcher(pDevice, &apiParam, 1) < 0)
+    if (XInputInternal::DeviceInfo::g_pfnGetStateDispatcher(pDevice, &apiParam, 1) < 0)
         return ERROR_EMPTY;
 
     gamepadState.Gamepad.wButtons &= XINPUT_BUTTON_MASK_WITHOUT_GUIDE;
@@ -2526,6 +3286,192 @@ DWORD Controller_CalculateKeyFromThumbPos(SHORT base, SHORT X, SHORT Y)
 }
 
 /////////////////////////////////////////////////////
+// Global functions
+/////////////////////////////////////////////////////
+HRESULT InitializeOverrides()
+{
+    int TokenInformation;
+    DWORD ReturnLength;
+    HRESULT hr;
+
+    if (QuirkIsEnabled(0x1F0000) ||
+        GetTokenInformation((HANDLE)-4, (TOKEN_INFORMATION_CLASS)(TokenAuditPolicy|TokenSessionId|TokenUser), &TokenInformation, sizeof(TokenInformation), &ReturnLength) == FALSE ||
+        TokenInformation == 0)
+    {
+        return S_OK;
+    }
+
+    XInputCore::g_hXInputUapDll = LoadLibraryExW(L"XInputUap.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
+    if (XInputCore::g_hXInputUapDll == nullptr)
+        goto on_error;
+
+#define LoadOverride(X)\
+    XInputCore::g_pfn##X##_Override = (decltype(XInputCore::g_pfn##X##_Override))GetProcAddress(XInputCore::g_hXInputUapDll, #X);\
+    if(XInputCore::g_pfn##X##_Override == nullptr)\
+        goto on_error;
+
+    LoadOverride(XInputGetState);
+    LoadOverride(XInputSetState);
+    LoadOverride(XInputGetCapabilities);
+    LoadOverride(XInputEnable);
+    LoadOverride(XInputGetAudioDeviceIds);
+    LoadOverride(XInputGetBatteryInformation);
+    LoadOverride(XInputGetKeystroke);
+        
+#undef LoadOverride
+
+    return S_OK;
+
+on_error:
+    hr = GetLastError();
+    if (hr > 0)
+        hr = (hr&0xFFFF) | 0x80070000;
+
+    return hr;
+}
+
+void CleanupOverrides()
+{
+    if (XInputCore::g_hXInputUapDll != nullptr)
+    {
+        XInputCore::g_pfnXInputGetState_Override = nullptr;
+        XInputCore::g_pfnXInputSetState_Override = nullptr;
+        XInputCore::g_pfnXInputGetCapabilities_Override = nullptr;
+        XInputCore::g_pfnXInputEnable_Override = nullptr;
+        XInputCore::g_pfnXInputGetAudioDeviceIds_Override = nullptr;
+        XInputCore::g_pfnXInputGetBatteryInformation_Override = nullptr;
+        XInputCore::g_pfnXInputGetKeystroke_Override = nullptr;
+        FreeLibrary(XInputCore::g_hXInputUapDll);
+        XInputCore::g_hXInputUapDll = nullptr;
+    }
+}
+
+void UnInitializeInputHost()
+{
+    //int v1;
+
+#ifndef OPENXINPUT_DISABLE_COM
+    if (XInputCore::g_InputHostClient == nullptr)
+        return;
+
+    //v1 = 0;
+    //if (CreateInputHostForProcess(&v1) >= 0
+    //    && (*(int(__thiscall**)(int, struct IInputHostClient*))(*(_DWORD*)v1 + 16))(v1, XInputCore::g_InputHostClient) >= 0)
+    //{
+    //    XInputCore::g_InputHostClient->Release();
+    //    XInputCore::g_InputHostClient = 0;
+    //}
+#endif
+}
+
+void EventWriteDllLoaded(HRESULT hr)
+{
+    //void* v1; // esi
+    //int v2; // ecx
+    //void* v3; // [esp+4h] [ebp-3Ch]
+    //char v4; // [esp+8h] [ebp-38h]
+    //int* v5; // [esp+28h] [ebp-18h]
+    //int v6; // [esp+2Ch] [ebp-14h]
+    //int v7; // [esp+30h] [ebp-10h]
+    //int v8; // [esp+34h] [ebp-Ch]
+    //
+    //v1 = this;
+    //if ((unsigned int)dword_10008010 > 5 && _TlgKeywordOn(0x400000000000i64))
+    //{
+    //    v6 = 0;
+    //    v8 = 0;
+    //    v3 = v1;
+    //    v5 = (int*)&v3;
+    //    v7 = 4;
+    //    _TlgWrite(v2, v2, 3, &v4);
+    //}
+}
+
+void EventWriteVidPid(WORD vendorId, WORD productId)
+{
+    //int* v2;
+    //unsigned __int8 v3;
+    //int* v4;
+    //unsigned __int16 v5;
+    //unsigned __int16 v6;
+    //char v7;
+    //unsigned __int16* v8;
+    //int v9;
+    //int v10;
+    //int v11;
+    //unsigned __int16* v12;
+    //int v13;]
+    //int v14;]
+    //int v15;
+    //
+    //v5 = productId;
+    //v2 = (int*)(vendorId | (productId << 16));
+    //v6 = vendorId;
+    //v3 = 0;
+    //while (1)
+    //{
+    //    v4 = g_VidPids[v3];
+    //    if (!v4)
+    //        break;
+    //    if (v4 == v2)
+    //        return;
+    //    if (++v3 >= 0x10u)
+    //        goto LABEL_7;
+    //}
+    //g_VidPids[v3] = v2;
+//LABEL_7:
+    //if (v3 != 16 && (unsigned int)dword_10008010 > 5 && _TlgKeywordOn(0x400000000000i64))
+    //{
+    //    v9 = 0;
+    //    v8 = &v6;
+    //    v10 = 2;
+    //    v11 = 0;
+    //    v12 = &v5;
+    //    v13 = 0;
+    //    v14 = 2;
+    //    v15 = 0;
+    //    _TlgWrite(2, 2, 4, &v7);
+    //}
+}
+
+HRESULT RegisterUtcEventProvider()
+{
+    //HRESULT hr;
+    //unsigned int v1;
+    //int v3;
+    //int v4;
+    //int v5;
+    //int v6;
+    //
+    //memset(&g_VidPids, 0, 0x40u);
+    //v3 = *(_DWORD*)&(*off_10008014)[-16];
+    //v4 = *(_DWORD*)&(*off_10008014)[-12];
+    //v5 = *(_DWORD*)&(*off_10008014)[-8];
+    //v6 = *(_DWORD*)&(*off_10008014)[-4];
+    //dword_10008030 = 0;
+    //dword_10008034 = 0;
+    //hr = EventRegister(&v3, _TlgEnableCallback, &dword_10008010, &dword_10008028);
+    //if (hr == S_OK)
+    //{
+    //    EventSetInformation(dword_10008028, dword_1000802C, 2, off_10008014, *(_WORD*)off_10008014);
+    //}
+    //else if(hr > 0)
+    //{
+    //    hr = (hr&0xFFFF) | 0x80070000;
+    //}
+    //return v1;
+    return S_OK;
+}
+
+void UnregisterUtcEventProvider()
+{
+    //EventUnregister(dword_10008028, dword_1000802C);
+    //dword_10008028 = 0;
+    //dword_1000802C = 0;
+    //dword_10008010 = 0;
+}
+
+/////////////////////////////////////////////////////
 // Exported functions
 /////////////////////////////////////////////////////
 #ifdef __cplusplus
@@ -2542,11 +3488,17 @@ BOOL WINAPI DllMain(HINSTANCE hInstDll, DWORD fdwReason, LPVOID lpvReserved)
     switch (fdwReason)
     {
         case DLL_PROCESS_DETACH:
-            res = XInputCore::Close();
+            res = XInputCore::Close(lpvReserved != nullptr);
+            UnregisterUtcEventProvider();
             break;
 
         case DLL_PROCESS_ATTACH:
+            hr = RegisterUtcEventProvider();
             res = XInputCore::Initialize();
+            if (hr >= 0)
+            {
+                EventWriteDllLoaded(res == TRUE ? 0 : E_FAIL);
+            }
             break;
 
         case DLL_THREAD_ATTACH:
@@ -2572,27 +3524,36 @@ int OpenXinputInitLibrary()
 
 void OpenXinputReleaseLibrary()
 {
-    XInputCore::Close();
+    XInputCore::Close(false);
 }
 
 #endif
 
 DWORD WINAPI OpenXInputGetState(_In_ DWORD dwUserIndex, _Out_ XINPUT_STATE* pState)
 {
-    GetStateApiParam_t apiParam;
-    HRESULT hr;
     DWORD result;
 
     if (dwUserIndex > XUSER_MAX_COUNT || pState == nullptr)
         return ERROR_BAD_ARGUMENTS;
 
-    apiParam.pState = pState;
+    if (XInputCore::g_pfnXInputGetState_Override)
+    {
+        result = XInputCore::g_pfnXInputGetState_Override(dwUserIndex, pState);
+    }
+    else
+    {
+        result = OpenXInputGetStateEx(dwUserIndex, pState);
 
-    hr = XInputCore::ProcessAPIRequest(dwUserIndex, DeviceInfo::g_pfnGetStateDispatcher, &apiParam, 1);
-    result = XInputReturnCodeFromHRESULT(hr);
+        if (result == ERROR_SUCCESS)
+        {
+            DeviceInfo_t* pDevice;
 
-    if (result == ERROR_SUCCESS)
-        pState->Gamepad.wButtons &= XINPUT_BUTTON_MASK_WITHOUT_GUIDE;
+            if (DeviceEnum::GetDeviceOnPort(dwUserIndex, &pDevice, 0) >= 0 && pDevice != nullptr)
+                EventWriteVidPid(pDevice->vendorId, pDevice->productId);
+
+            pState->Gamepad.wButtons &= XINPUT_BUTTON_MASK_WITHOUT_GUIDE;
+        }
+    }
 
     return result;
 }
@@ -2601,32 +3562,42 @@ DWORD WINAPI OpenXInputSetState(_In_ DWORD dwUserIndex, _In_ XINPUT_VIBRATION* p
 {
     SetStateApiParam_t apiParam;
     HRESULT hr;
+    DWORD result;
 
     if (dwUserIndex > XUSER_MAX_COUNT || pVibration == nullptr)
         return ERROR_BAD_ARGUMENTS;
 
-    apiParam.pVibration = pVibration;
+    if (XInputCore::g_pfnXInputSetState_Override)
+    {
+        result = XInputCore::g_pfnXInputSetState_Override(dwUserIndex, pVibration);
+    }
+    else
+    {
+        apiParam.pVibration = pVibration;
 
-    hr = XInputCore::ProcessAPIRequest(dwUserIndex, DeviceInfo::g_pfnSetVibrationDispatcher, &apiParam, 1);
-    return XInputReturnCodeFromHRESULT(hr);
+        hr = XInputCore::ProcessAPIRequest(dwUserIndex, XInputInternal::DeviceInfo::g_pfnSetVibrationDispatcher, &apiParam, 1, FALSE);
+        result = XInputReturnCodeFromHRESULT(hr);
+    }
+    return result;
 }
 
 DWORD WINAPI OpenXInputGetCapabilities(_In_ DWORD dwUserIndex, _In_ DWORD dwFlags, _Out_ XINPUT_CAPABILITIES* pCapabilities)
 {
-    GetCapabilitiesApiParam_t apiParam;
+    XINPUT_CAPABILITIES_EX capabilitiesEx;
     DWORD result;
-    HRESULT hr;
-    if (dwUserIndex > XUSER_MAX_COUNT || (dwFlags != 0 && dwFlags != XINPUT_CAPS_FFB_SUPPORTED) || pCapabilities == nullptr)
+    if (dwUserIndex > XUSER_MAX_COUNT || pCapabilities == nullptr)
         return ERROR_BAD_ARGUMENTS;
 
-    apiParam.pCapabilities = pCapabilities;
-
-    hr = XInputCore::ProcessAPIRequest(dwUserIndex, DeviceInfo::g_pfnGetCapabilitiesDispatcher, &apiParam, 1);
-    result = XInputReturnCodeFromHRESULT(hr);
-
-    if (result == ERROR_SUCCESS)
-        pCapabilities->Gamepad.wButtons &= XINPUT_BUTTON_MASK_WITHOUT_GUIDE;
-
+    if (XInputCore::g_pfnXInputGetCapabilities_Override)
+    {
+        result = XInputCore::g_pfnXInputGetCapabilities_Override(dwUserIndex, dwFlags, pCapabilities);
+    }
+    else
+    {
+        result = OpenXInputGetCapabilitiesEx(1, dwUserIndex, dwFlags, &capabilitiesEx);
+        if (result == ERROR_SUCCESS)
+            CopyMemory(pCapabilities, &capabilitiesEx.Capabilities, sizeof(XINPUT_CAPABILITIES));
+    }
     return result;
 }
 
@@ -2635,50 +3606,76 @@ void WINAPI OpenXInputEnable(_In_ BOOL enable)
     XInputCore::EnableCommunications(enable != FALSE);
 }
 
-DWORD WINAPI OpenXInputGetDSoundAudioDeviceGuids(_In_ DWORD dwUserIndex, _Out_ GUID* pDSoundRenderGuid, _Out_ GUID* pDSoundCaptureGuid)
+DWORD WINAPI OpenXInputGetAudioDeviceIds(_In_ DWORD dwUserIndex, _Out_writes_opt_(*pRenderCount) LPWSTR pRenderDeviceId, _Inout_opt_ UINT* pRenderCount, _Out_writes_opt_(*pCaptureCount) LPWSTR pCaptureDeviceId, _Inout_opt_ UINT* pCaptureCount)
 {
-    HRESULT hr;
     DWORD result;
+    HRESULT hr;
+    OSVERSIONINFOW VersionInformation;
     bool doApiCall;
-    bool run;
-    HANDLE hDevice;
-    DeviceInfo_t device;
-    GetAudioDeviceGuidsApiParam_t apiParam;
+    GetAudioDeviceIdApiParam_t apiParam;
 
-    if (dwUserIndex > XUSER_MAX_COUNT || pDSoundRenderGuid == nullptr || pDSoundCaptureGuid == nullptr)
+    if(dwUserIndex > XUSER_MAX_COUNT ||
+        (pRenderCount == nullptr && pCaptureCount == nullptr) || 
+        (pRenderDeviceId != nullptr && pRenderCount == nullptr) ||
+        (pCaptureDeviceId != nullptr && pCaptureCount == nullptr))
+    {
         return ERROR_BAD_ARGUMENTS;
+    }
 
-    apiParam.pHeadphoneGuid = pDSoundRenderGuid;
-    apiParam.pMicrophoneGuid = pDSoundCaptureGuid;
+    if (XInputCore::g_pfnXInputGetAudioDeviceIds_Override)
+    {
+        return XInputCore::g_pfnXInputGetAudioDeviceIds_Override(dwUserIndex, pRenderDeviceId, pRenderCount, pCaptureDeviceId, pCaptureCount);
+    }
 
     doApiCall = true;
-    result = ERROR_DEVICE_NOT_CONNECTED;
-    QuickDriverEnum quickEnum;
-    run = quickEnum.Restart();
-    while (run)
+    memset(&VersionInformation, 0, sizeof(OSVERSIONINFOW));
+    VersionInformation.dwOSVersionInfoSize = sizeof(OSVERSIONINFOW);
+    if (!GetVersionExW(&VersionInformation) || VersionInformation.dwMajorVersion >= 6)
     {
-        hDevice = INVALID_HANDLE_VALUE;
-        run = quickEnum.GetNext(&hDevice);
-        if (hDevice != INVALID_HANDLE_VALUE)
+        HANDLE hDevice;
+        QuickDriverEnum quickEnum;
+        DeviceInfo_t device;
+
+        apiParam.pCaptureCount = pCaptureCount;
+        apiParam.pCaptureDeviceId = pCaptureDeviceId;
+        apiParam.pRenderCount = pRenderCount;
+        apiParam.pRenderDeviceId = pRenderDeviceId;
+
+        bool run = quickEnum.Restart();
+        while (run)
         {
-            if (quickEnum.MinFillFromInterface(hDevice, &device) && device.wType == 0x0102)
+            run = quickEnum.GetNext(&hDevice);
+            if (hDevice != INVALID_HANDLE_VALUE)
             {
-                device.dwUserIndex = (BYTE)dwUserIndex;
-                if (DeviceInfo::g_pfnGetAudioDeviceGuidsDispatcher(&device, &apiParam, 2) >= 0)
+                if (XInputInternal::DeviceInfo::MinFillFromInterface(hDevice, &device) == 1 && device.wType >= 0x0102)
                 {
-                    doApiCall = false;
-                    run = false;
-                    result = ERROR_SUCCESS;
+                    device.dwUserIndex = static_cast<BYTE>(dwUserIndex);
+                    if (XInputInternal::DeviceInfo::GetAudioDevice(&device, &apiParam, 4) >= 0)
+                    {
+                        doApiCall = false;
+                        run = false;
+                        result = ERROR_SUCCESS;
+                    }
                 }
+                CloseHandle(hDevice);
             }
-            CloseHandle(hDevice);
+        }
+        if (doApiCall)
+        {
+            hr = XInputCore::ProcessAPIRequest(
+                dwUserIndex,
+                XInputInternal::DeviceInfo::GetAudioDevice,
+                &apiParam,
+                4u,
+                FALSE);
+            result = XInputReturnCodeFromHRESULT(hr);
         }
     }
-    if (doApiCall == 1)
+    else
     {
-        hr = XInputCore::ProcessAPIRequest(dwUserIndex, DeviceInfo::g_pfnGetAudioDeviceGuidsDispatcher, &apiParam, 2u);
-        result = XInputReturnCodeFromHRESULT(hr);
+        result = ERROR_NOT_SUPPORTED;
     }
+
     return result;
 }
 
@@ -2692,44 +3689,51 @@ DWORD WINAPI OpenXInputGetBatteryInformation(_In_ DWORD dwUserIndex, _In_ BYTE d
     if (dwUserIndex > XUSER_MAX_COUNT || pBatteryInformation == nullptr)
         return ERROR_BAD_ARGUMENTS;
 
-    pBatteryInformation->BatteryLevel = 0;
-    pBatteryInformation->BatteryType = 0;
-
-    result = ERROR_SUCCESS;
-    doApiCall = true;
-    if (devType == XINPUT_DEVTYPE_GAMEPAD)
+    if (XInputCore::g_pfnXInputGetBatteryInformation_Override)
     {
-        HANDLE hDevice;
-        DeviceInfo_t device;
-        result = ERROR_DEVICE_NOT_CONNECTED;
-        QuickDriverEnum quickEnum;
-        bool run = quickEnum.Restart();
-        while (run)
+        result = XInputCore::g_pfnXInputGetBatteryInformation_Override(dwUserIndex, devType, pBatteryInformation);
+    }
+    else
+    {
+        pBatteryInformation->BatteryLevel = 0;
+        pBatteryInformation->BatteryType = 0;
+
+        result = ERROR_SUCCESS;
+        doApiCall = true;
+        if (devType == XINPUT_DEVTYPE_GAMEPAD)
         {
-            hDevice = INVALID_HANDLE_VALUE;
-            run = quickEnum.GetNext(&hDevice);
-            if (hDevice != INVALID_HANDLE_VALUE)
+            HANDLE hDevice;
+            DeviceInfo_t device;
+            result = ERROR_DEVICE_NOT_CONNECTED;
+            QuickDriverEnum quickEnum;
+            bool run = quickEnum.Restart();
+            while (run)
             {
-                if (quickEnum.MinFillFromInterface(hDevice, &device) && device.wType >= 0x0102)
+                hDevice = INVALID_HANDLE_VALUE;
+                run = quickEnum.GetNext(&hDevice);
+                if (hDevice != INVALID_HANDLE_VALUE)
                 {
-                    device.dwUserIndex = (BYTE)dwUserIndex;
-                    if (DriverComm::GetBatteryInformation(&device, XINPUT_DEVTYPE_GAMEPAD, pBatteryInformation) >= 0)
+                    if (XInputInternal::DeviceInfo::MinFillFromInterface(hDevice, &device) && device.wType >= 0x0102)
                     {
-                        doApiCall = 0;
-                        run = 0;
-                        result = ERROR_SUCCESS;
+                        device.dwUserIndex = (BYTE)dwUserIndex;
+                        if (DriverComm::GetBatteryInformation(&device, XINPUT_DEVTYPE_GAMEPAD, pBatteryInformation) >= 0)
+                        {
+                            doApiCall = 0;
+                            run = 0;
+                            result = ERROR_SUCCESS;
+                        }
                     }
+                    CloseHandle(hDevice);
                 }
-                CloseHandle(hDevice);
             }
         }
-    }
-    if (doApiCall)
-    {
-        apiParam.DeviceType = &devType;
-        apiParam.pBatteryInformation = pBatteryInformation;
-        hr = XInputCore::ProcessAPIRequest(dwUserIndex, DeviceInfo::g_pfnGetBatteryInformationDispatcher, &apiParam, 2);
-        result = XInputReturnCodeFromHRESULT(hr);
+        if (doApiCall)
+        {
+            apiParam.DeviceType = &devType;
+            apiParam.pBatteryInformation = pBatteryInformation;
+            hr = XInputCore::ProcessAPIRequest(dwUserIndex, XInputInternal::DeviceInfo::GetBatteryInformation, &apiParam, 2, FALSE);
+            result = XInputReturnCodeFromHRESULT(hr);
+        }
     }
 
     return result;
@@ -2743,32 +3747,39 @@ DWORD WINAPI OpenXInputGetKeystroke(_In_ DWORD dwUserIndex, _Reserved_ DWORD dwR
     if ((dwUserIndex > XUSER_MAX_COUNT && dwUserIndex != XUSER_INDEX_ANY) || pKeystroke == nullptr)
         return ERROR_BAD_ARGUMENTS;
 
-    apiParam.lpReserved = &dwReserved;
-    apiParam.pKeystroke = pKeystroke;
-    apiParam.lpLastError = &result;
-    if (dwUserIndex < XUSER_MAX_COUNT)
+    if (XInputCore::g_pfnXInputGetKeystroke_Override)
     {
-        result = ERROR_SUCCESS;
-        hr = XInputCore::ProcessAPIRequest(dwUserIndex, DeviceInfo::g_pfnGetKeystrokeDispatcher, &apiParam, 3);
-        if (hr >= 0)
-            pKeystroke->UserIndex = (BYTE)dwUserIndex;
-        else
-            result = XInputReturnCodeFromHRESULT(hr);
+        result = XInputCore::g_pfnXInputGetKeystroke_Override(dwUserIndex, dwReserved, pKeystroke);
     }
     else
     {
-        result = ERROR_EMPTY;
-        for (BYTE i = 0; i < XUSER_MAX_COUNT; ++i)
+        apiParam.lpReserved = &dwReserved;
+        apiParam.pKeystroke = pKeystroke;
+        apiParam.lpLastError = &result;
+        if (dwUserIndex < XUSER_MAX_COUNT)
         {
-            hr = XInputCore::ProcessAPIRequest(i, DeviceInfo::g_pfnGetKeystrokeDispatcher, &apiParam, 3);
-            if (result == ERROR_SUCCESS)
-            {
-                pKeystroke->UserIndex = i;
-                break;
-            }
+            result = ERROR_SUCCESS;
+            hr = XInputCore::ProcessAPIRequest(dwUserIndex, XInputInternal::DeviceInfo::GetKeystroke, &apiParam, 3, FALSE);
+            if (hr >= 0)
+                pKeystroke->UserIndex = (BYTE)dwUserIndex;
+            else
+                result = XInputReturnCodeFromHRESULT(hr);
         }
-        if (result != ERROR_SUCCESS)
+        else
+        {
             result = ERROR_EMPTY;
+            for (BYTE i = 0; i < XUSER_MAX_COUNT; ++i)
+            {
+                hr = XInputCore::ProcessAPIRequest(i, XInputInternal::DeviceInfo::GetKeystroke, &apiParam, 3, FALSE);
+                if (result == ERROR_SUCCESS)
+                {
+                    pKeystroke->UserIndex = i;
+                    break;
+                }
+            }
+            if (result != ERROR_SUCCESS)
+                result = ERROR_EMPTY;
+        }
     }
 
     return result;
@@ -2776,16 +3787,25 @@ DWORD WINAPI OpenXInputGetKeystroke(_In_ DWORD dwUserIndex, _Reserved_ DWORD dwR
 
 DWORD WINAPI OpenXInputGetStateEx(_In_ DWORD dwUserIndex, _Out_ XINPUT_STATE* pState)
 {
+    DWORD result;
     HRESULT hr;
     GetStateApiParam_t apiParam;
 
     if (dwUserIndex > XUSER_MAX_COUNT || pState == nullptr)
         return ERROR_BAD_ARGUMENTS;
 
-    apiParam.pState = pState;
+    if (XInputCore::g_pfnXInputGetState_Override)
+    {
+        result = XInputCore::g_pfnXInputGetState_Override(dwUserIndex, pState);
+    }
+    else
+    {
+        apiParam.pState = pState;
 
-    hr = XInputCore::ProcessAPIRequest(dwUserIndex, DeviceInfo::g_pfnGetStateDispatcher, &apiParam, 1);
-    return XInputReturnCodeFromHRESULT(hr);
+        hr = XInputCore::ProcessAPIRequest(dwUserIndex, XInputInternal::DeviceInfo::g_pfnGetStateDispatcher, &apiParam, 1, FALSE);
+        result = XInputReturnCodeFromHRESULT(hr);
+    }
+    return result;
 }
 
 DWORD WINAPI OpenXInputWaitForGuideButton(_In_ DWORD dwUserIndex, _In_ HANDLE hEvent, _Out_ XINPUT_LISTEN_STATE* pListenState)
@@ -2802,7 +3822,7 @@ DWORD WINAPI OpenXInputWaitForGuideButton(_In_ DWORD dwUserIndex, _In_ HANDLE hE
     apiParam.lphEvent = &hEvent;
     apiParam.pListenState = pListenState;
 
-    hr = XInputCore::ProcessAPIRequest(dwUserIndex, DeviceInfo::g_pfnWaitForGuideButton, &apiParam, 2);
+    hr = XInputCore::ProcessAPIRequest(dwUserIndex, XInputInternal::DeviceInfo::WaitForGuideButton, &apiParam, 2, FALSE);
     return XInputReturnCodeFromHRESULT(hr);
 }
 
@@ -2813,7 +3833,7 @@ DWORD WINAPI OpenXInputCancelGuideButtonWait(_In_ DWORD dwUserIndex)
     if (dwUserIndex > XUSER_MAX_COUNT)
         return ERROR_BAD_ARGUMENTS;
 
-    hr = XInputCore::ProcessAPIRequest(dwUserIndex, DeviceInfo::g_pfnCancelGuideButtonWait, nullptr, 0);
+    hr = XInputCore::ProcessAPIRequest(dwUserIndex, XInputInternal::DeviceInfo::CancelGuideButtonWait, nullptr, 0, FALSE);
     return XInputReturnCodeFromHRESULT(hr);
 }
 
@@ -2824,9 +3844,53 @@ DWORD WINAPI OpenXInputPowerOffController(_In_ DWORD dwUserIndex)
     if (dwUserIndex > XUSER_MAX_COUNT)
         return ERROR_BAD_ARGUMENTS;
 
-    hr = XInputCore::ProcessAPIRequest(dwUserIndex, DeviceInfo::g_pfnPowerOffController, nullptr, 0);
+    hr = XInputCore::ProcessAPIRequest(dwUserIndex, XInputInternal::DeviceInfo::PowerOffController, nullptr, 0, FALSE);
     return XInputReturnCodeFromHRESULT(hr);
 
+}
+
+DWORD WINAPI OpenXInputGetBaseBusInformation(_In_ DWORD dwBusIndex, _Out_ XINPUT_BASE_BUS_INFORMATION* pBaseBusInformation)
+{
+    DWORD result;
+    HRESULT hr;
+    GetBaseBusInformationApiParam_t apiParam;
+
+    if (dwBusIndex < DeviceList::BusDeviceListSize || pBaseBusInformation == nullptr)
+        return ERROR_BAD_ARGUMENTS;
+
+    apiParam.pBaseBusInformation = pBaseBusInformation;
+
+    result = XInputCore::ProcessAPIRequest(
+        dwBusIndex,
+        XInputInternal::DeviceInfo::GetBaseBusInformation,
+        &apiParam,
+        1u,
+        TRUE);
+    hr = XInputReturnCodeFromHRESULT(result);
+
+    return hr;
+}
+
+DWORD WINAPI OpenXInputGetCapabilitiesEx(_In_ DWORD dwReserved, _In_ DWORD dwUserIndex, _In_ DWORD dwFlags, _Out_ XINPUT_CAPABILITIES_EX* pCapabilitiesEx)
+{
+    GetCapabilitiesApiParam_t apiParam;
+    DWORD result;
+    HRESULT hr;
+    if (dwUserIndex > XUSER_MAX_COUNT || (dwFlags != 0 && dwFlags != XINPUT_CAPS_FFB_SUPPORTED) || pCapabilitiesEx == nullptr)
+        return ERROR_BAD_ARGUMENTS;
+
+    apiParam.pCapabilities = pCapabilitiesEx;
+
+    if (dwReserved != 1)
+        return ERROR_INVALID_DATA;
+
+    hr = XInputCore::ProcessAPIRequest(dwUserIndex, XInputInternal::DeviceInfo::GetCapabilities, &apiParam, 1, FALSE);
+    result = XInputReturnCodeFromHRESULT(hr);
+
+    if (result == ERROR_SUCCESS)
+        pCapabilitiesEx->Capabilities.Gamepad.wButtons &= XINPUT_BUTTON_MASK;
+
+    return result;
 }
 
 DWORD WINAPI OpenXInputGetMaxControllerCount()

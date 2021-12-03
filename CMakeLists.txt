@@ -6,15 +6,33 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
-option(OPENXINPUT_STATIC_GUIDS           "Static GUIDs instead. (Uses less dependencies)" ON)
-option(OPENXINPUT_DISABLE_DSOUND_HEADERS "Don't include direct_sound headers. (Uses less dependencies)" ON)
+option(OPENXINPUT_STATIC_GUIDS     "Static GUIDs instead. (Uses less dependencies)" ON)
+option(OPENXINPUT_DISABLE_COM      "Disable COM calls." ON)
+
 set(OPENXINPUT_XUSER_MAX_COUNT 8 CACHE STRING "Max controller count supported by OpenXinput. (Can't be less than 4 because of Xinput compatibility)")
 
-option(OPENXINPUT_BUILD_EXAMPLE          "Build OpenXinput example." OFF)
+option(OPENXINPUT_BUILD_EXAMPLE    "Build OpenXinput example." OFF)
 
 option(BUILD_SHARED_LIBS "Build OpenXinput as a Xinput replacement. If set to no, all exported library functions will be prepended with 'Open', like 'OpenXinputGetState'." ON)
 
-set(LIBRARY_NAME Xinput1_3)
+##################
+## DEVOBJ
+add_library(devobj SHARED
+  DEVOBJ/DEVOBJ.c
+  DEVOBJ/DEVOBJ.h
+  DEVOBJ/DEVOBJ.def
+)
+
+set_target_properties(devobj
+    PROPERTIES
+    ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
+    LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/dustbin/bin"
+)
+
+##################
+## OpenXinput
+set(LIBRARY_NAME Xinput1_4)
 
 set(OPENXINPUT_SOURCES
   src/OpenXinput.cpp
@@ -38,20 +56,35 @@ set_target_properties(${LIBRARY_NAME} PROPERTIES
   CXX_VISIBILITY_PRESET hidden
   VISIBILITY_INLINES_HIDDEN ON
 )
+
+target_include_directories(${LIBRARY_NAME}
+  PRIVATE
+  DEVOBJ
+)
  
 target_link_libraries(${LIBRARY_NAME}
   PRIVATE
-  setupapi
+  devobj
+  
+  mincore
+  WindowsApp
 )
 
 target_compile_definitions(${LIBRARY_NAME}
   PRIVATE
   $<$<BOOL:${OPENXINPUT_STATIC_GUIDS}>:OPENXINPUT_STATIC_GUIDS>
-  $<$<BOOL:${OPENXINPUT_DISABLE_DSOUND_HEADERS}>:OPENXINPUT_DISABLE_DSOUND_HEADERS>
+  $<$<BOOL:${OPENXINPUT_DISABLE_COM}>:OPENXINPUT_DISABLE_COM>
   $<$<BOOL:${OPENXINPUT_XUSER_MAX_COUNT}>:OPENXINPUT_XUSER_MAX_COUNT=${OPENXINPUT_XUSER_MAX_COUNT}>
   
   PUBLIC
   $<$<BOOL:${BUILD_SHARED_LIBS}>:OPENXINPUT_BUILD_SHARED>
+)
+
+set_target_properties(${LIBRARY_NAME}
+  PROPERTIES
+  ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
+  LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
+  RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
 )
 
 ##################
@@ -70,6 +103,13 @@ target_link_libraries(openxinput_example
 target_include_directories(openxinput_example
   PRIVATE
   src/
+)
+
+set_target_properties(openxinput_example
+    PROPERTIES
+    ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
+    LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
 )
 
 endif()

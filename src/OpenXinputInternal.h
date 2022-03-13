@@ -157,6 +157,7 @@ DEFINE_HIDDEN_DEVPROPKEY(static_DEVPKEY_DeviceInterface_ClassGuid, 0x026e516e, 0
     #define XINPUT_DEVINTERFACE_AUDIO_RENDER         static_DEVINTERFACE_AUDIO_RENDER
     #define XINPUT_DEVINTERFACE_AUDIO_CAPTURE        static_DEVINTERFACE_AUDIO_CAPTURE
 #else
+    #include <devguid.h>
     #define XINPUT_IID_IClassFactory                 IID_IClassFactory
     #define XINPUT_IID_IKsPropertySet                IID_IKsPropertySet
 

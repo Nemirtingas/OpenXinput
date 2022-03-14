@@ -21,6 +21,7 @@
     // Build guids, don't need to link against other dll
     #define INITGUID
 #else
+    #include <devguid.h>
     #include <mmdeviceapi.h>
     #include <functiondiscoverykeys.h>
 #endif

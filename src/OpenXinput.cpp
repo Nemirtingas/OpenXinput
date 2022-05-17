@@ -2583,7 +2583,7 @@ DWORD WINAPI OpenXInputGetState(_In_ DWORD dwUserIndex, _Out_ XINPUT_STATE* pSta
     HRESULT hr;
     DWORD result;
 
-    if (dwUserIndex > XUSER_MAX_COUNT || pState == nullptr)
+    if (dwUserIndex >= XUSER_MAX_COUNT || pState == nullptr)
         return ERROR_BAD_ARGUMENTS;
 
     apiParam.pState = pState;
@@ -2602,7 +2602,7 @@ DWORD WINAPI OpenXInputSetState(_In_ DWORD dwUserIndex, _In_ XINPUT_VIBRATION* p
     SetStateApiParam_t apiParam;
     HRESULT hr;
 
-    if (dwUserIndex > XUSER_MAX_COUNT || pVibration == nullptr)
+    if (dwUserIndex >= XUSER_MAX_COUNT || pVibration == nullptr)
         return ERROR_BAD_ARGUMENTS;
 
     apiParam.pVibration = pVibration;
@@ -2616,7 +2616,7 @@ DWORD WINAPI OpenXInputGetCapabilities(_In_ DWORD dwUserIndex, _In_ DWORD dwFlag
     GetCapabilitiesApiParam_t apiParam;
     DWORD result;
     HRESULT hr;
-    if (dwUserIndex > XUSER_MAX_COUNT || (dwFlags != 0 && dwFlags != XINPUT_CAPS_FFB_SUPPORTED) || pCapabilities == nullptr)
+    if (dwUserIndex >= XUSER_MAX_COUNT || (dwFlags != 0 && dwFlags != XINPUT_CAPS_FFB_SUPPORTED) || pCapabilities == nullptr)
         return ERROR_BAD_ARGUMENTS;
 
     apiParam.pCapabilities = pCapabilities;
@@ -2645,7 +2645,7 @@ DWORD WINAPI OpenXInputGetDSoundAudioDeviceGuids(_In_ DWORD dwUserIndex, _Out_ G
     DeviceInfo_t device;
     GetAudioDeviceGuidsApiParam_t apiParam;
 
-    if (dwUserIndex > XUSER_MAX_COUNT || pDSoundRenderGuid == nullptr || pDSoundCaptureGuid == nullptr)
+    if (dwUserIndex >= XUSER_MAX_COUNT || pDSoundRenderGuid == nullptr || pDSoundCaptureGuid == nullptr)
         return ERROR_BAD_ARGUMENTS;
 
     apiParam.pHeadphoneGuid = pDSoundRenderGuid;
@@ -2689,7 +2689,7 @@ DWORD WINAPI OpenXInputGetBatteryInformation(_In_ DWORD dwUserIndex, _In_ BYTE d
     bool doApiCall;
     GetBatteryInformationApiParam_t apiParam;
 
-    if (dwUserIndex > XUSER_MAX_COUNT || pBatteryInformation == nullptr)
+    if (dwUserIndex >= XUSER_MAX_COUNT || pBatteryInformation == nullptr)
         return ERROR_BAD_ARGUMENTS;
 
     pBatteryInformation->BatteryLevel = 0;
@@ -2740,7 +2740,7 @@ DWORD WINAPI OpenXInputGetKeystroke(_In_ DWORD dwUserIndex, _Reserved_ DWORD dwR
     GetKeystrokeApiParam_t apiParam;
     DWORD result;
     HRESULT hr;
-    if ((dwUserIndex > XUSER_MAX_COUNT && dwUserIndex != XUSER_INDEX_ANY) || pKeystroke == nullptr)
+    if ((dwUserIndex >= XUSER_MAX_COUNT && dwUserIndex != XUSER_INDEX_ANY) || pKeystroke == nullptr)
         return ERROR_BAD_ARGUMENTS;
 
     apiParam.lpReserved = &dwReserved;
@@ -2779,7 +2779,7 @@ DWORD WINAPI OpenXInputGetStateEx(_In_ DWORD dwUserIndex, _Out_ XINPUT_STATE* pS
     HRESULT hr;
     GetStateApiParam_t apiParam;
 
-    if (dwUserIndex > XUSER_MAX_COUNT || pState == nullptr)
+    if (dwUserIndex >= XUSER_MAX_COUNT || pState == nullptr)
         return ERROR_BAD_ARGUMENTS;
 
     apiParam.pState = pState;
@@ -2793,7 +2793,7 @@ DWORD WINAPI OpenXInputWaitForGuideButton(_In_ DWORD dwUserIndex, _In_ HANDLE hE
     HRESULT hr;
     WaitGuideButtonApiParam_t apiParam;
 
-    if (dwUserIndex > XUSER_MAX_COUNT || pListenState == nullptr)
+    if (dwUserIndex >= XUSER_MAX_COUNT || pListenState == nullptr)
         return ERROR_BAD_ARGUMENTS;
 
     if (hEvent == INVALID_HANDLE_VALUE)
@@ -2810,7 +2810,7 @@ DWORD WINAPI OpenXInputCancelGuideButtonWait(_In_ DWORD dwUserIndex)
 {
     HRESULT hr;
 
-    if (dwUserIndex > XUSER_MAX_COUNT)
+    if (dwUserIndex >= XUSER_MAX_COUNT)
         return ERROR_BAD_ARGUMENTS;
 
     hr = XInputCore::ProcessAPIRequest(dwUserIndex, DeviceInfo::g_pfnCancelGuideButtonWait, nullptr, 0);
@@ -2821,7 +2821,7 @@ DWORD WINAPI OpenXInputPowerOffController(_In_ DWORD dwUserIndex)
 {
     HRESULT hr;
 
-    if (dwUserIndex > XUSER_MAX_COUNT)
+    if (dwUserIndex >= XUSER_MAX_COUNT)
         return ERROR_BAD_ARGUMENTS;
 
     hr = XInputCore::ProcessAPIRequest(dwUserIndex, DeviceInfo::g_pfnPowerOffController, nullptr, 0);

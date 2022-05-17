@@ -3533,7 +3533,7 @@ DWORD WINAPI OpenXInputGetState(_In_ DWORD dwUserIndex, _Out_ XINPUT_STATE* pSta
 {
     DWORD result;
 
-    if (dwUserIndex > XUSER_MAX_COUNT || pState == nullptr)
+    if (dwUserIndex >= XUSER_MAX_COUNT || pState == nullptr)
         return ERROR_BAD_ARGUMENTS;
 
     if (XInputCore::g_pfnXInputGetState_Override)
@@ -3564,7 +3564,7 @@ DWORD WINAPI OpenXInputSetState(_In_ DWORD dwUserIndex, _In_ XINPUT_VIBRATION* p
     HRESULT hr;
     DWORD result;
 
-    if (dwUserIndex > XUSER_MAX_COUNT || pVibration == nullptr)
+    if (dwUserIndex >= XUSER_MAX_COUNT || pVibration == nullptr)
         return ERROR_BAD_ARGUMENTS;
 
     if (XInputCore::g_pfnXInputSetState_Override)
@@ -3585,7 +3585,7 @@ DWORD WINAPI OpenXInputGetCapabilities(_In_ DWORD dwUserIndex, _In_ DWORD dwFlag
 {
     XINPUT_CAPABILITIES_EX capabilitiesEx;
     DWORD result;
-    if (dwUserIndex > XUSER_MAX_COUNT || pCapabilities == nullptr)
+    if (dwUserIndex >= XUSER_MAX_COUNT || pCapabilities == nullptr)
         return ERROR_BAD_ARGUMENTS;
 
     if (XInputCore::g_pfnXInputGetCapabilities_Override)
@@ -3614,7 +3614,7 @@ DWORD WINAPI OpenXInputGetAudioDeviceIds(_In_ DWORD dwUserIndex, _Out_writes_opt
     bool doApiCall;
     GetAudioDeviceIdApiParam_t apiParam;
 
-    if(dwUserIndex > XUSER_MAX_COUNT ||
+    if(dwUserIndex >= XUSER_MAX_COUNT ||
         (pRenderCount == nullptr && pCaptureCount == nullptr) || 
         (pRenderDeviceId != nullptr && pRenderCount == nullptr) ||
         (pCaptureDeviceId != nullptr && pCaptureCount == nullptr))
@@ -3686,7 +3686,7 @@ DWORD WINAPI OpenXInputGetBatteryInformation(_In_ DWORD dwUserIndex, _In_ BYTE d
     bool doApiCall;
     GetBatteryInformationApiParam_t apiParam;
 
-    if (dwUserIndex > XUSER_MAX_COUNT || pBatteryInformation == nullptr)
+    if (dwUserIndex >= XUSER_MAX_COUNT || pBatteryInformation == nullptr)
         return ERROR_BAD_ARGUMENTS;
 
     if (XInputCore::g_pfnXInputGetBatteryInformation_Override)
@@ -3744,7 +3744,7 @@ DWORD WINAPI OpenXInputGetKeystroke(_In_ DWORD dwUserIndex, _Reserved_ DWORD dwR
     GetKeystrokeApiParam_t apiParam;
     DWORD result;
     HRESULT hr;
-    if ((dwUserIndex > XUSER_MAX_COUNT && dwUserIndex != XUSER_INDEX_ANY) || pKeystroke == nullptr)
+    if ((dwUserIndex >= XUSER_MAX_COUNT && dwUserIndex != XUSER_INDEX_ANY) || pKeystroke == nullptr)
         return ERROR_BAD_ARGUMENTS;
 
     if (XInputCore::g_pfnXInputGetKeystroke_Override)
@@ -3791,7 +3791,7 @@ DWORD WINAPI OpenXInputGetStateEx(_In_ DWORD dwUserIndex, _Out_ XINPUT_STATE* pS
     HRESULT hr;
     GetStateApiParam_t apiParam;
 
-    if (dwUserIndex > XUSER_MAX_COUNT || pState == nullptr)
+    if (dwUserIndex >= XUSER_MAX_COUNT || pState == nullptr)
         return ERROR_BAD_ARGUMENTS;
 
     if (XInputCore::g_pfnXInputGetState_Override)
@@ -3813,7 +3813,7 @@ DWORD WINAPI OpenXInputWaitForGuideButton(_In_ DWORD dwUserIndex, _In_ HANDLE hE
     HRESULT hr;
     WaitGuideButtonApiParam_t apiParam;
 
-    if (dwUserIndex > XUSER_MAX_COUNT || pListenState == nullptr)
+    if (dwUserIndex >= XUSER_MAX_COUNT || pListenState == nullptr)
         return ERROR_BAD_ARGUMENTS;
 
     if (hEvent == INVALID_HANDLE_VALUE)
@@ -3830,7 +3830,7 @@ DWORD WINAPI OpenXInputCancelGuideButtonWait(_In_ DWORD dwUserIndex)
 {
     HRESULT hr;
 
-    if (dwUserIndex > XUSER_MAX_COUNT)
+    if (dwUserIndex >= XUSER_MAX_COUNT)
         return ERROR_BAD_ARGUMENTS;
 
     hr = XInputCore::ProcessAPIRequest(dwUserIndex, XInputInternal::DeviceInfo::CancelGuideButtonWait, nullptr, 0, FALSE);
@@ -3841,7 +3841,7 @@ DWORD WINAPI OpenXInputPowerOffController(_In_ DWORD dwUserIndex)
 {
     HRESULT hr;
 
-    if (dwUserIndex > XUSER_MAX_COUNT)
+    if (dwUserIndex >= XUSER_MAX_COUNT)
         return ERROR_BAD_ARGUMENTS;
 
     hr = XInputCore::ProcessAPIRequest(dwUserIndex, XInputInternal::DeviceInfo::PowerOffController, nullptr, 0, FALSE);
@@ -3876,7 +3876,7 @@ DWORD WINAPI OpenXInputGetCapabilitiesEx(_In_ DWORD dwReserved, _In_ DWORD dwUse
     GetCapabilitiesApiParam_t apiParam;
     DWORD result;
     HRESULT hr;
-    if (dwUserIndex > XUSER_MAX_COUNT || (dwFlags != 0 && dwFlags != XINPUT_CAPS_FFB_SUPPORTED) || pCapabilitiesEx == nullptr)
+    if (dwUserIndex >= XUSER_MAX_COUNT || (dwFlags != 0 && dwFlags != XINPUT_CAPS_FFB_SUPPORTED) || pCapabilitiesEx == nullptr)
         return ERROR_BAD_ARGUMENTS;
 
     apiParam.pCapabilities = pCapabilitiesEx;

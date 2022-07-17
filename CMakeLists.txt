@@ -40,7 +40,7 @@ set_target_properties(${LIBRARY_NAME} PROPERTIES
 )
  
 target_link_libraries(${LIBRARY_NAME}
-  PRIVATE
+  PUBLIC
   setupapi
 )
 

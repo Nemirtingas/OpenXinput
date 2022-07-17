@@ -14,3 +14,5 @@ XInputCancelGuideButtonWait     @102 NONAME
 XInputPowerOffController        @103 NONAME
 
 OpenXInputGetMaxControllerCount @999
+OpenXInputGetDeviceUSBIds       @1000
+OpenXInputGetStateFull          @1001

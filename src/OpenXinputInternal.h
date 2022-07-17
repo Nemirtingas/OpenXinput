@@ -88,6 +88,12 @@ DECLARE_INTERFACE_(IKsPropertySet, IUnknown)
 
 #endif
 
+#define XUSB_VERSION_1_0 ((SHORT)0x0100)
+#define XUSB_VERSION_1_1 ((SHORT)0x0101)
+#define XUSB_VERSION_1_2 ((SHORT)0x0102)
+#define XUSB_VERSION_1_3 ((SHORT)0x0103)
+#define XUSB_VERSION_1_4 ((SHORT)0x0104)
+
 #define DEVICE_STATUS_ACTIVE 1
 
 #define DEFINE_HIDDEN_GUID(name, l, w1, w2, b1, b2, b3, b4, b5, b6, b7, b8) \

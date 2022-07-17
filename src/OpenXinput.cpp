@@ -35,9 +35,9 @@ struct DeviceInfo_t {
     DWORD dwDevicePathSize;
     LPWSTR field_18;
     SIZE_T field_1C;
-    WORD wType;
+    WORD XUSBVersion;
     WORD field_22;
-    XINPUT_STATE DeviceState;
+    OPENXINPUT_STATE_FULL DeviceState;
     XINPUT_VIBRATION DeviceVibration;
     WORD field_38;
     WORD field_3A;
@@ -83,13 +83,13 @@ struct InVibrationBuffer_t
 
 struct InGetAudioDeviceInformation_t
 {
-    WORD wType;
+    WORD XUSBVersion;
     BYTE DeviceIndex;
 };
 
 struct OutGetAudioDeviceInformation_t
 {
-    WORD unk0;
+    WORD XUSBVersion;
     WORD vendorId;
     WORD productId;
     BYTE inputId;
@@ -97,20 +97,19 @@ struct OutGetAudioDeviceInformation_t
 
 struct InGetLEDBuffer_t
 {
-    WORD wType;
+    WORD XUSBVersion;
     BYTE DeviceIndex;
 };
 
 struct OutGetLEDBuffer_t
 {
-    BYTE unk0;
-    BYTE unk1;
+    WORD XUSBVersion;
     BYTE LEDState;
 };
 
 struct OutDeviceInfos_t
 {
-    WORD wType;
+    WORD XUSBVersion;
     BYTE deviceIndex;
     BYTE unk1;
     WORD unk2;
@@ -121,20 +120,19 @@ struct OutDeviceInfos_t
 
 struct InPowerOffBuffer_t
 {
-    WORD wType;
+    WORD XUSBVersion;
     BYTE DeviceIndex;
 };
 
 struct InWaitForGuideButtonBuffer_t
 {
-    WORD wType;
+    WORD XUSBVersion;
     BYTE DeviceIndex;
 };
 
 struct OutWaitForGuideButtonBuffer_t
 {
-    BYTE field_0;
-    BYTE field_1;
+    WORD XUSBVersion;
     BYTE status;
     BYTE field_3;
     BYTE field_4;
@@ -179,7 +177,7 @@ struct GamepadState0100
 
 struct InGamepadState0101
 {
-    WORD wType;
+    WORD XUSBVersion;
     BYTE DeviceIndex;
 };
 
@@ -205,19 +203,18 @@ struct GamepadState0101
     BYTE  unk8;
     BYTE  unk9;
     BYTE  unk10;
-    BYTE  unk11;
+    BYTE  bExtraButtons;
 };
 
 struct InGamepadCapabilities0101
 {
-    WORD wType;
+    WORD XUSBVersion;
     BYTE DeviceIndex;
 };
 
 struct GamepadCapabilities0101
 {
-    BYTE  unk0;
-    BYTE  unk1;
+    WORD  XUSBVersion;
     BYTE  Type;
     BYTE  SubType;
     WORD  wButtons;
@@ -239,14 +236,14 @@ struct GamepadCapabilities0101
 
 struct InGamepadBatteryInformation0102
 {
-    WORD wType;
+    WORD XUSBVersion;
     BYTE DeviceIndex;
     BYTE DeviceType;
 };
 
 struct GamepadBatteryInformation0102
 {
-    WORD wType;
+    WORD XUSBVersion;
     BYTE BatteryType;
     BYTE BatteryLevel;
 };
@@ -255,7 +252,7 @@ struct GamepadBatteryInformation0102
 
 struct GetStateApiParam_t
 {
-    XINPUT_STATE* pState;
+    OPENXINPUT_STATE_FULL* pState;
 };
 
 struct SetStateApiParam_t
@@ -306,6 +303,13 @@ struct WaitForGuideButtonHelperApiParam_t
     HANDLE hGuideEvent;
     BYTE dwUserIndex;
     XINPUT_LISTEN_STATE* pListenState;
+};
+
+struct GetDeviceUSBIdsApiParam_t
+{
+    WORD* pVendorId;
+    WORD* pProductId;
+    WORD* pInputId;
 };
 
 constexpr DWORD SET_USER_LED_ON_CREATE       = (1 << 0);
@@ -484,6 +488,8 @@ HRESULT GetAudioDeviceGuids(DeviceInfo_t* pDevice, void* pParams, DWORD reserved
 HRESULT GetBatteryInformation(DeviceInfo_t* pDevice, void* pParams, DWORD reserved);
 HRESULT GetCapabilities(DeviceInfo_t* pDevice, void* pParams, DWORD reserved);
 HRESULT WaitForGuideButton(DeviceInfo_t* pDevice, void* pParams, DWORD reserved);
+
+HRESULT GetDeviceUSBIds(DeviceInfo_t* pDevice, void* pParams, DWORD reserved);
 
 void OnEnableSettingChanged(BOOL bEnabled);
 
@@ -706,7 +712,7 @@ public:
         pDevice->hDevice = hDevice;
         pDevice->status = DEVICE_STATUS_ACTIVE;
         pDevice->hGuideWait = INVALID_HANDLE_VALUE;
-        pDevice->wType = outBuff.wType;
+        pDevice->XUSBVersion = outBuff.XUSBVersion;
         pDevice->vendorId = outBuff.vendorId;
         pDevice->productId = outBuff.productId;
         return true;
@@ -765,14 +771,17 @@ HRESULT GrowList(DWORD newSize)
 
 void CopyGamepadStateToDeviceInfo(DeviceInfo_t* pDevice, GamepadState0100 *pGamepadState)
 {
-    pDevice->DeviceState.dwPacketNumber = pGamepadState->dwPacketNumber;
-    pDevice->DeviceState.Gamepad.bLeftTrigger = pGamepadState->bLeftTrigger;
-    pDevice->DeviceState.Gamepad.bRightTrigger = pGamepadState->bRightTrigger;
-    pDevice->DeviceState.Gamepad.sThumbLX = pGamepadState->sThumbLX;
-    pDevice->DeviceState.Gamepad.sThumbLY = pGamepadState->sThumbLY;
-    pDevice->DeviceState.Gamepad.sThumbRX = pGamepadState->sThumbRX;
-    pDevice->DeviceState.Gamepad.sThumbRY = pGamepadState->sThumbRY;
-    pDevice->DeviceState.Gamepad.wButtons = pGamepadState->wButtons;
+    pDevice->DeviceState.XinputState.dwPacketNumber = pGamepadState->dwPacketNumber;
+    pDevice->DeviceState.XinputState.Gamepad.bLeftTrigger = pGamepadState->bLeftTrigger;
+    pDevice->DeviceState.XinputState.Gamepad.bRightTrigger = pGamepadState->bRightTrigger;
+    pDevice->DeviceState.XinputState.Gamepad.sThumbLX = pGamepadState->sThumbLX;
+    pDevice->DeviceState.XinputState.Gamepad.sThumbLY = pGamepadState->sThumbLY;
+    pDevice->DeviceState.XinputState.Gamepad.sThumbRX = pGamepadState->sThumbRX;
+    pDevice->DeviceState.XinputState.Gamepad.sThumbRY = pGamepadState->sThumbRY;
+    pDevice->DeviceState.XinputState.Gamepad.wButtons = pGamepadState->wButtons;
+
+    pDevice->DeviceState.GamepadExtras.dwExtraButtons = 0;
+
     if (pGamepadState->status == 1)
         pDevice->status |= DEVICE_STATUS_ACTIVE;
     else
@@ -783,15 +792,19 @@ void CopyGamepadStateToDeviceInfo(DeviceInfo_t* pDevice, GamepadState0100 *pGame
 
 void CopyGamepadStateToDeviceInfo(DeviceInfo_t* pDevice, GamepadState0101* pGamepadState)
 {
-    pDevice->DeviceState.dwPacketNumber = pGamepadState->dwPacketNumber;
-    pDevice->DeviceState.Gamepad.bLeftTrigger = pGamepadState->bLeftTrigger;
-    pDevice->DeviceState.Gamepad.bRightTrigger = pGamepadState->bRightTrigger;
-    pDevice->DeviceState.Gamepad.sThumbLX = pGamepadState->sThumbLX;
-    pDevice->DeviceState.Gamepad.sThumbLY = pGamepadState->sThumbLY;
-    pDevice->DeviceState.Gamepad.sThumbRX = pGamepadState->sThumbRX;
-    pDevice->DeviceState.Gamepad.sThumbRY = pGamepadState->sThumbRY;
-    pDevice->DeviceState.Gamepad.wButtons = pGamepadState->wButtons;
-    pDevice->DeviceState.Gamepad.wButtons &= XINPUT_BUTTON_MASK;
+    pDevice->DeviceState.XinputState.dwPacketNumber = pGamepadState->dwPacketNumber;
+    pDevice->DeviceState.XinputState.Gamepad.bLeftTrigger = pGamepadState->bLeftTrigger;
+    pDevice->DeviceState.XinputState.Gamepad.bRightTrigger = pGamepadState->bRightTrigger;
+    pDevice->DeviceState.XinputState.Gamepad.sThumbLX = pGamepadState->sThumbLX;
+    pDevice->DeviceState.XinputState.Gamepad.sThumbLY = pGamepadState->sThumbLY;
+    pDevice->DeviceState.XinputState.Gamepad.sThumbRX = pGamepadState->sThumbRX;
+    pDevice->DeviceState.XinputState.Gamepad.sThumbRY = pGamepadState->sThumbRY;
+    pDevice->DeviceState.XinputState.Gamepad.wButtons = pGamepadState->wButtons;
+    pDevice->DeviceState.XinputState.Gamepad.wButtons &= XINPUT_BUTTON_MASK;
+
+    pDevice->DeviceState.GamepadExtras.dwExtraButtons = 0;
+    if (pGamepadState->bExtraButtons & 0x01)
+        pDevice->DeviceState.GamepadExtras.dwExtraButtons |= OPENXINPUT_GAMEPAD_EXTRAS_SHARE;
 
     if (pGamepadState->status == 1)
         pDevice->status |= DEVICE_STATUS_ACTIVE;
@@ -911,7 +924,7 @@ HRESULT EnumerateDevicesOnDeviceInterface(HANDLE hDevice, LPCWSTR lpDevicePath)
         pDevice->dwUserIndex = i;
         pDevice->productId = deviceInfos.productId;
         pDevice->vendorId = deviceInfos.vendorId;
-        pDevice->wType = deviceInfos.wType;
+        pDevice->XUSBVersion = deviceInfos.XUSBVersion;
         hr = DriverComm::GetLatestDeviceInfo(pDevice);
         if (hr >= 0)
         {
@@ -1197,7 +1210,7 @@ HRESULT GetState(DeviceInfo_t* pDevice, void* pParams, DWORD reserved)
     if ((hr = DriverComm::GetLatestDeviceInfo(pDevice)) < 0)
         return hr;
 
-    return Utilities::SafeCopyToUntrustedBuffer(pApiParam->pState, &pDevice->DeviceState, sizeof(XINPUT_STATE));
+    return Utilities::SafeCopyToUntrustedBuffer(pApiParam->pState, &pDevice->DeviceState, sizeof(*pApiParam->pState));
 }
 
 HRESULT SetVibration(DeviceInfo_t* pDevice, void* pParams, DWORD reserved)
@@ -1229,7 +1242,7 @@ HRESULT GetState(DeviceInfo_t* pDevice, void* pParams, DWORD reserved)
         return E_FAIL;
 
     if (Utilities::SafeCopyToUntrustedBuffer(pApiParam->pState, &DisabledXINPUT_STATE, sizeof(XINPUT_STATE)) >= 0)
-        pApiParam->pState->dwPacketNumber = pDevice->DeviceState.dwPacketNumber + 1;
+        pApiParam->pState->XinputState.dwPacketNumber = pDevice->DeviceState.XinputState.dwPacketNumber + 1;
 
     return S_OK;
 }
@@ -1380,7 +1393,7 @@ HRESULT GetAudioDeviceGuids(DeviceInfo_t* pDevice, void* pParams, DWORD reserved
     vendorId = pDevice->vendorId;
     productId = pDevice->productId;
     inputId = pDevice->inputId;
-    if (pDevice->wType >= 0x0102)
+    if (pDevice->XUSBVersion >= XUSB_VERSION_1_2)
     {
         if (DriverComm::GetAudioDeviceInformation(pDevice, &AudioInformation) < 0)
             return E_FAIL;
@@ -1519,6 +1532,20 @@ HRESULT WaitForGuideButton(DeviceInfo_t* pDevice, void* pParams, DWORD reserved)
     }
 
     return hr;
+}
+
+HRESULT GetDeviceUSBIds(DeviceInfo_t* pDevice, void* pParams, DWORD reserved)
+{
+    GetDeviceUSBIdsApiParam_t* pApiParam = (GetDeviceUSBIdsApiParam_t*)pParams;
+
+    if (IsDeviceInactive(pDevice))
+        return E_FAIL;
+
+    *pApiParam->pVendorId = pDevice->vendorId;
+    *pApiParam->pProductId = pDevice->productId;
+    *pApiParam->pInputId = pDevice->inputId;
+
+    return S_OK;
 }
 
 void OnEnableSettingChanged(BOOL bEnabled)
@@ -1807,7 +1834,7 @@ HRESULT GetLatestDeviceInfo(DeviceInfo_t* pDevice)
 
     DWORD outSize;
 
-    if (pDevice->wType == 0x0100)
+    if (pDevice->XUSBVersion == XUSB_VERSION_1_0)
     {
         inBuffer.in0100.DeviceIndex = pDevice->dwUserIndex;
         inSize = sizeof(inBuffer.in0100);
@@ -1816,7 +1843,7 @@ HRESULT GetLatestDeviceInfo(DeviceInfo_t* pDevice)
     }
     else
     {
-        inBuffer.in0101.wType = 0x0101;
+        inBuffer.in0101.XUSBVersion = XUSB_VERSION_1_1;
         inBuffer.in0101.DeviceIndex = pDevice->dwUserIndex;
         inSize = sizeof(inBuffer.in0101);
 
@@ -1827,7 +1854,7 @@ HRESULT GetLatestDeviceInfo(DeviceInfo_t* pDevice)
     if (hr < 0)
         return hr;
 
-    if (pDevice->wType == 0x0100)
+    if (pDevice->XUSBVersion == XUSB_VERSION_1_0)
     {
         CopyGamepadStateToDeviceInfo(pDevice, &outBuffer.out0100);
     }
@@ -1863,10 +1890,10 @@ HRESULT GetCapabilities(DeviceInfo_t* pDevice, XINPUT_CAPABILITIES* pCapabilitie
     InGamepadCapabilities0101 InBuffer;
     GamepadCapabilities0101 OutBuffer;
 
-    if (pDevice->wType == 0x0100)
+    if (pDevice->XUSBVersion == XUSB_VERSION_1_0)
         return Utilities::SafeCopyToUntrustedBuffer(pCapabilities, &s_GamepadCapabilities, sizeof(XINPUT_CAPABILITIES));
 
-    InBuffer.wType = 0x0101;
+    InBuffer.XUSBVersion = XUSB_VERSION_1_1;
     InBuffer.DeviceIndex = pDevice->dwUserIndex;
     ZeroMemory(&OutBuffer, sizeof(GamepadCapabilities0101));
 
@@ -1889,9 +1916,9 @@ HRESULT GetBatteryInformation(DeviceInfo_t* pDevice, BYTE DeviceType, XINPUT_BAT
     GUID HeadphoneGuid;
     GUID MicrophoneGuid;
 
-    if (pDevice->wType >= 0x102u)
+    if (pDevice->XUSBVersion >= XUSB_VERSION_1_2)
     {
-        InBuffer.wType = 0x102;
+        InBuffer.XUSBVersion = XUSB_VERSION_1_2;
         InBuffer.DeviceIndex = pDevice->dwUserIndex;
         InBuffer.DeviceType = DeviceType;
         
@@ -1929,10 +1956,10 @@ HRESULT GetAudioDeviceInformation(DeviceInfo_t* pDevice, DeviceInfo::XINPUT_AUDI
     InGetAudioDeviceInformation_t InBuffer;
     OutGetAudioDeviceInformation_t OutBuffer;
 
-    if (pDevice->wType < 0x0102)
+    if (pDevice->XUSBVersion < XUSB_VERSION_1_2)
         return E_FAIL;
 
-    InBuffer.wType = 0x102;
+    InBuffer.XUSBVersion = XUSB_VERSION_1_2;
     InBuffer.DeviceIndex = pDevice->dwUserIndex;
     hr = SendReceiveIoctl(pDevice->hDevice, Protocol::IOCTL_XINPUT_GET_AUDIO_INFORMATION, &InBuffer, sizeof(InGetAudioDeviceInformation_t), &OutBuffer, sizeof(OutGetAudioDeviceInformation_t), nullptr);
     if (hr >= 0)
@@ -1951,10 +1978,10 @@ HRESULT GetLEDState(DeviceInfo_t* pDevice, BYTE* ledState)
     HRESULT hr;
 
     *ledState = Protocol::LEDState::XINPUT_LED_OFF;
-    if (pDevice->wType < 0x0101)
+    if (pDevice->XUSBVersion < XUSB_VERSION_1_1)
         return S_OK;
 
-    inBuffer.wType = 0x0101;
+    inBuffer.XUSBVersion = XUSB_VERSION_1_1;
     inBuffer.DeviceIndex = pDevice->dwUserIndex;
     hr = SendReceiveIoctl(pDevice->hDevice, Protocol::IOCTL_XINPUT_GET_LED_STATE, &inBuffer, sizeof(InGetLEDBuffer_t), &outBuffer, sizeof(OutGetLEDBuffer_t), nullptr);
     if (hr >= 0)
@@ -1969,10 +1996,10 @@ HRESULT PowerOffController(DeviceInfo_t* pDevice)
 {
     InPowerOffBuffer_t inBuff;
 
-    if (pDevice->wType < 0x0102)
+    if (pDevice->XUSBVersion < XUSB_VERSION_1_2)
         return E_FAIL;
 
-    inBuff.wType = 0x0102;
+    inBuff.XUSBVersion = XUSB_VERSION_1_2;
     inBuff.DeviceIndex = pDevice->dwUserIndex;
     return SendIoctl(pDevice->hDevice, Protocol::IOCTL_XINPUT_POWER_DOWN_DEVICE, &inBuff, sizeof(InPowerOffBuffer_t));
 }
@@ -1996,7 +2023,7 @@ HRESULT WaitForGuideButton(HANDLE hDevice, DWORD dwUserIndex, XINPUT_LISTEN_STAT
     overlapped.OffsetHigh = 0;
     overlapped.hEvent = hEvent;
 
-    inBuffer.wType = 0x0102;
+    inBuffer.XUSBVersion = XUSB_VERSION_1_2;
     inBuffer.DeviceIndex = (BYTE)dwUserIndex;
 
     ZeroMemory(&outBuffer, sizeof(OutWaitForGuideButtonBuffer_t));
@@ -2344,7 +2371,7 @@ DWORD Controller_GetUserKeystroke(DeviceInfo_t* pDevice, BYTE bUserIndex, DWORD 
     static DWORD s_dwKeyPressStart;
     static BOOL  s_bKeyDown;
 
-    XINPUT_STATE gamepadState;
+    OPENXINPUT_STATE_FULL gamepadState;
     GetStateApiParam_t apiParam;
     DWORD virtualKey;
     int key;
@@ -2355,14 +2382,14 @@ DWORD Controller_GetUserKeystroke(DeviceInfo_t* pDevice, BYTE bUserIndex, DWORD 
     if (DeviceInfo::g_pfnGetStateDispatcher(pDevice, &apiParam, 1) < 0)
         return ERROR_EMPTY;
 
-    gamepadState.Gamepad.wButtons &= XINPUT_BUTTON_MASK_WITHOUT_GUIDE;
+    gamepadState.XinputState.Gamepad.wButtons &= XINPUT_BUTTON_MASK_WITHOUT_GUIDE;
 
     pKeystroke->UserIndex = bUserIndex;
     pKeystroke->Unicode = 0;
 
     key = 0;
 
-    virtualKey = Controller_CalculateKeyFromThumbPos(VK_PAD_LTHUMB_UP, gamepadState.Gamepad.sThumbLX, gamepadState.Gamepad.sThumbLY);
+    virtualKey = Controller_CalculateKeyFromThumbPos(VK_PAD_LTHUMB_UP, gamepadState.XinputState.Gamepad.sThumbLX, gamepadState.XinputState.Gamepad.sThumbLY);
     pKeystroke->VirtualKey = (WORD)virtualKey;
     if (pDevice->LeftStickVirtualKey != virtualKey)
     {
@@ -2378,7 +2405,7 @@ DWORD Controller_GetUserKeystroke(DeviceInfo_t* pDevice, BYTE bUserIndex, DWORD 
         pDevice->LeftStickVirtualKey = (WORD)virtualKey;
     }
 
-    virtualKey = Controller_CalculateKeyFromThumbPos(VK_PAD_RTHUMB_UP, gamepadState.Gamepad.sThumbRX, gamepadState.Gamepad.sThumbRY);
+    virtualKey = Controller_CalculateKeyFromThumbPos(VK_PAD_RTHUMB_UP, gamepadState.XinputState.Gamepad.sThumbRX, gamepadState.XinputState.Gamepad.sThumbRY);
 
     if (virtualKey)
         pKeystroke->VirtualKey = (WORD)virtualKey;
@@ -2397,9 +2424,9 @@ DWORD Controller_GetUserKeystroke(DeviceInfo_t* pDevice, BYTE bUserIndex, DWORD 
     }
 
     pressedTriggers = 0;
-    if (gamepadState.Gamepad.bLeftTrigger > 30u)
+    if (gamepadState.XinputState.Gamepad.bLeftTrigger > 30u)
         pressedTriggers = 1;
-    if (gamepadState.Gamepad.bRightTrigger > 30u)
+    if (gamepadState.XinputState.Gamepad.bRightTrigger > 30u)
         pressedTriggers = 2;
 
     virtualKey = VK_PAD_LTRIGGER;
@@ -2439,7 +2466,7 @@ DWORD Controller_GetUserKeystroke(DeviceInfo_t* pDevice, BYTE bUserIndex, DWORD 
 
         if(pDevice->wButtons & keyBit)
         {
-            if (!(gamepadState.Gamepad.wButtons & keyBit))
+            if (!(gamepadState.XinputState.Gamepad.wButtons & keyBit))
             {
                 pDevice->wButtons &= ~keyBit;
                 pKeystroke->VirtualKey = (WORD)virtualKey;
@@ -2449,7 +2476,7 @@ DWORD Controller_GetUserKeystroke(DeviceInfo_t* pDevice, BYTE bUserIndex, DWORD 
             }
             pKeystroke->VirtualKey = (WORD)virtualKey;
         }
-        else if (gamepadState.Gamepad.wButtons & keyBit)
+        else if (gamepadState.XinputState.Gamepad.wButtons & keyBit)
         {
             pDevice->wButtons |= keyBit;
             key = virtualKey;
@@ -2579,17 +2606,8 @@ void OpenXinputReleaseLibrary()
 
 DWORD WINAPI OpenXInputGetState(_In_ DWORD dwUserIndex, _Out_ XINPUT_STATE* pState)
 {
-    GetStateApiParam_t apiParam;
-    HRESULT hr;
     DWORD result;
-
-    if (dwUserIndex >= XUSER_MAX_COUNT || pState == nullptr)
-        return ERROR_BAD_ARGUMENTS;
-
-    apiParam.pState = pState;
-
-    hr = XInputCore::ProcessAPIRequest(dwUserIndex, DeviceInfo::g_pfnGetStateDispatcher, &apiParam, 1);
-    result = XInputReturnCodeFromHRESULT(hr);
+    result = OpenXInputGetStateEx(dwUserIndex, pState);
 
     if (result == ERROR_SUCCESS)
         pState->Gamepad.wButtons &= XINPUT_BUTTON_MASK_WITHOUT_GUIDE;
@@ -2661,7 +2679,7 @@ DWORD WINAPI OpenXInputGetDSoundAudioDeviceGuids(_In_ DWORD dwUserIndex, _Out_ G
         run = quickEnum.GetNext(&hDevice);
         if (hDevice != INVALID_HANDLE_VALUE)
         {
-            if (quickEnum.MinFillFromInterface(hDevice, &device) && device.wType == 0x0102)
+            if (quickEnum.MinFillFromInterface(hDevice, &device) && device.XUSBVersion == XUSB_VERSION_1_2)
             {
                 device.dwUserIndex = (BYTE)dwUserIndex;
                 if (DeviceInfo::g_pfnGetAudioDeviceGuidsDispatcher(&device, &apiParam, 2) >= 0)
@@ -2710,7 +2728,7 @@ DWORD WINAPI OpenXInputGetBatteryInformation(_In_ DWORD dwUserIndex, _In_ BYTE d
             run = quickEnum.GetNext(&hDevice);
             if (hDevice != INVALID_HANDLE_VALUE)
             {
-                if (quickEnum.MinFillFromInterface(hDevice, &device) && device.wType >= 0x0102)
+                if (quickEnum.MinFillFromInterface(hDevice, &device) && device.XUSBVersion >= XUSB_VERSION_1_2)
                 {
                     device.dwUserIndex = (BYTE)dwUserIndex;
                     if (DriverComm::GetBatteryInformation(&device, XINPUT_DEVTYPE_GAMEPAD, pBatteryInformation) >= 0)
@@ -2776,16 +2794,20 @@ DWORD WINAPI OpenXInputGetKeystroke(_In_ DWORD dwUserIndex, _Reserved_ DWORD dwR
 
 DWORD WINAPI OpenXInputGetStateEx(_In_ DWORD dwUserIndex, _Out_ XINPUT_STATE* pState)
 {
-    HRESULT hr;
-    GetStateApiParam_t apiParam;
+    DWORD result;
+    OPENXINPUT_STATE_FULL full_state;
 
     if (dwUserIndex >= XUSER_MAX_COUNT || pState == nullptr)
         return ERROR_BAD_ARGUMENTS;
 
-    apiParam.pState = pState;
+    result = OpenXInputGetStateFull(dwUserIndex, &full_state);
 
-    hr = XInputCore::ProcessAPIRequest(dwUserIndex, DeviceInfo::g_pfnGetStateDispatcher, &apiParam, 1);
-    return XInputReturnCodeFromHRESULT(hr);
+    if (result == ERROR_SUCCESS)
+    {
+        memcpy(pState, &full_state.XinputState, sizeof(XINPUT_STATE));
+    }
+
+    return result;
 }
 
 DWORD WINAPI OpenXInputWaitForGuideButton(_In_ DWORD dwUserIndex, _In_ HANDLE hEvent, _Out_ XINPUT_LISTEN_STATE* pListenState)
@@ -2833,6 +2855,43 @@ DWORD WINAPI OpenXInputGetMaxControllerCount()
 {
     return XUSER_MAX_COUNT;
 }
+
+DWORD WINAPI OpenXInputGetDeviceUSBIds(DWORD dwUserIndex, WORD* pVendorId, WORD* pProductId, WORD* pInputId)
+{
+    DWORD result;
+    HRESULT hr;
+    GetDeviceUSBIdsApiParam_t apiParam;
+
+    if (dwUserIndex >= XUSER_MAX_COUNT || pVendorId == nullptr || pProductId == nullptr || pInputId == nullptr)
+        return ERROR_BAD_ARGUMENTS;
+
+    apiParam.pVendorId = pVendorId;
+    apiParam.pProductId = pProductId;
+    apiParam.pInputId = pInputId;
+
+    hr = XInputCore::ProcessAPIRequest(dwUserIndex, DeviceInfo::GetDeviceUSBIds, &apiParam, 1);
+    result = XInputReturnCodeFromHRESULT(hr);
+
+    return result;
+}
+
+DWORD WINAPI OpenXInputGetStateFull(DWORD dwUserIndex, OPENXINPUT_STATE_FULL* pState)
+{
+    DWORD result;
+    HRESULT hr;
+    GetStateApiParam_t apiParam;
+
+    if (dwUserIndex >= XUSER_MAX_COUNT || pState == nullptr)
+        return ERROR_BAD_ARGUMENTS;
+
+    apiParam.pState = pState;
+
+    hr = XInputCore::ProcessAPIRequest(dwUserIndex, DeviceInfo::g_pfnGetStateDispatcher, &apiParam, 1);
+    result = XInputReturnCodeFromHRESULT(hr);
+
+    return result;
+}
+
 
 #ifdef __cplusplus
 }

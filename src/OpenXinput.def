@@ -16,3 +16,5 @@ XInputGetBaseBusInformation     @104 NONAME
 XInputGetCapabilitiesEx         @108 NONAME
 
 OpenXInputGetMaxControllerCount @999
+OpenXInputGetDeviceUSBIds       @1000
+OpenXInputGetStateFull          @1001

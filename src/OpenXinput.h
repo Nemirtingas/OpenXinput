@@ -370,6 +370,22 @@ DWORD WINAPI OpenXInputGetDSoundAudioDeviceGuids
 
 // End of Xinput.h
 
+//
+// Constants for extra gamepad buttons
+//
+#define OPENXINPUT_GAMEPAD_EXTRAS_SHARE 0x000000001
+
+typedef struct _OPENXINPUT_GAMEPAD_EXTRAS
+{
+    DWORD                               dwExtraButtons;
+} OPENXINPUT_GAMEPAD_EXTRAS, *POPENXINPUT_GAMEPAD_EXTRAS;
+
+typedef struct _OPENXINPUT_STATE_FULL
+{
+    XINPUT_STATE                        XinputState;
+    OPENXINPUT_GAMEPAD_EXTRAS           GamepadExtras;
+} OPENXINPUT_STATE_FULL, *POPENXINPUT_STATE_FULL;
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -378,11 +394,26 @@ extern "C" {
 // It returns the compile-time XUSER_MAX_COUNT.
 DWORD WINAPI OpenXInputGetMaxControllerCount();
 
+DWORD WINAPI OpenXInputGetDeviceUSBIds
+(
+    _In_  DWORD dwUserIndex, // Index of the gamer associated with the device
+    _Out_ WORD* pVendorId  , // USB device vendor ID
+    _Out_ WORD* pProductId , // USB device product ID
+    _Out_ WORD* pInputId     // USB device input ID
+);
+
+DWORD WINAPI OpenXInputGetStateFull
+(
+    _In_  DWORD                  dwUserIndex,  // Index of the gamer associated with the device
+    _Out_ OPENXINPUT_STATE_FULL* pState        // Receives the current state
+);
+
 #ifdef __cplusplus
 }
 #endif
 typedef DWORD(WINAPI OpenXInputGetMaxControllerCount_t)();
-
+typedef DWORD(WINAPI OpenXInputGetDeviceUSBIds_t)(DWORD, WORD*, WORD*, WORD*);
+typedef DWORD(WINAPI OpenXInputGetStateFull_t)(DWORD, OPENXINPUT_STATE_FULL*);
 
 ////////////////////////////////////////
 // Here lies the hidden part on Xinput
@@ -392,11 +423,10 @@ typedef struct _XINPUT_CAPABILITIES_EX
     XINPUT_CAPABILITIES Capabilities;
     WORD VendorId;
     WORD ProductId;
-    WORD unk0;
+    WORD ProductVersion;
     WORD unk1;
     DWORD unk2;
 } XINPUT_CAPABILITIES_EX, *PXINPUT_CAPABILITIES_EX;
-
 
 typedef struct _XINPUT_LISTEN_STATE
 {

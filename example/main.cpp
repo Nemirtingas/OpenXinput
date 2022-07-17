@@ -35,8 +35,9 @@ enum XInputDeviceConsoleBufferIndex
     DEVICE_CAPABILITY_TYPE            ,
     DEVICE_CAPABILITY_SUBTYPE         ,
     DEVICE_CAPABILITY_FLAGS           ,
-    DEVICE_CAPABILITY_PRODUCTID       ,
     DEVICE_CAPABILITY_VENDORID        ,
+    DEVICE_CAPABILITY_PRODUCTID       ,
+    DEVICE_CAPABILITY_INPUTID         ,
     DEVICE_STATE_HEADER               ,
     DEVICE_STATE_BUTTON_DPAD_UP       ,
     DEVICE_STATE_BUTTON_DPAD_DOWN     ,
@@ -59,6 +60,7 @@ enum XInputDeviceConsoleBufferIndex
     DEVICE_STATE_LEFTTHUMBY           ,
     DEVICE_STATE_RIGHTTHUMBX          ,
     DEVICE_STATE_RIGHTTHUMBY          ,
+    DEVICE_STATE_EXTRA_SHARE          ,
     DEVICE_MAX_CONSOLE_LINES
 };
 
@@ -71,11 +73,16 @@ struct XInputDevice_t
     char consoleBuffer[DEVICE_MAX_CONSOLE_LINES][MAX_DEVICE_LINE_WIDTH+1];
     XINPUT_CAPABILITIES_EX capabilities;
     XINPUT_BATTERY_INFORMATION battery;
-    XINPUT_STATE oldState;
-    XINPUT_STATE state;
+    OPENXINPUT_STATE_FULL oldState;
+    OPENXINPUT_STATE_FULL state;
+    WORD vendorId;
+    WORD productId;
+    WORD inputId;
 };
 
 static DWORD XinputMaxControllerCount = XUSER_MAX_COUNT;
+static OpenXInputGetDeviceUSBIds_t* pOpenXInputGetDeviceUSBIds = nullptr;
+static OpenXInputGetStateFull_t* pOpenXInputGetStateFull = nullptr;
 
 // conio library
 #define COLOR_BLACK 0
@@ -404,31 +411,34 @@ void BuildDeviceConsoleOutput(XInputDevice_t& device)
     sprintf_s(device.consoleBuffer[DEVICE_CAPABILITY_SUBTYPE]         , "  - SubType  : %s", XInputDevSubTypeToStr(device.capabilities.Capabilities.SubType));
     sprintf_s(device.consoleBuffer[DEVICE_CAPABILITY_FLAGS]           , "  - Flags    : 0x%04hx", device.capabilities.Capabilities.Flags);
     // Capabilities Ex
-    sprintf_s(device.consoleBuffer[DEVICE_CAPABILITY_PRODUCTID]       , "  - ProductId: 0x%04hx", device.capabilities.ProductId);
-    sprintf_s(device.consoleBuffer[DEVICE_CAPABILITY_VENDORID]        , "  - VendorId : 0x%04hx", device.capabilities.VendorId);
+    sprintf_s(device.consoleBuffer[DEVICE_CAPABILITY_VENDORID]        , "  - VendorId : 0x%04hx", device.vendorId);
+    sprintf_s(device.consoleBuffer[DEVICE_CAPABILITY_PRODUCTID]       , "  - ProductId: 0x%04hx", device.productId);
+    sprintf_s(device.consoleBuffer[DEVICE_CAPABILITY_INPUTID]         , "  - InputId  : 0x%04hx", device.inputId);
     // State
     sprintf_s(device.consoleBuffer[DEVICE_STATE_HEADER]               , "Device State:");
-    sprintf_s(device.consoleBuffer[DEVICE_STATE_BUTTON_DPAD_UP]       , "  - UP       : %u", (device.state.Gamepad.wButtons & XINPUT_GAMEPAD_DPAD_UP) != 0);
-    sprintf_s(device.consoleBuffer[DEVICE_STATE_BUTTON_DPAD_DOWN]     , "  - DOWN     : %u", (device.state.Gamepad.wButtons & XINPUT_GAMEPAD_DPAD_DOWN) != 0);
-    sprintf_s(device.consoleBuffer[DEVICE_STATE_BUTTON_DPAD_LEFT]     , "  - LEFT     : %u", (device.state.Gamepad.wButtons & XINPUT_GAMEPAD_DPAD_LEFT) != 0);
-    sprintf_s(device.consoleBuffer[DEVICE_STATE_BUTTON_DPAD_RIGHT]    , "  - RIGHT    : %u", (device.state.Gamepad.wButtons & XINPUT_GAMEPAD_DPAD_RIGHT) != 0);
-    sprintf_s(device.consoleBuffer[DEVICE_STATE_BUTTON_START]         , "  - START    : %u", (device.state.Gamepad.wButtons & XINPUT_GAMEPAD_START) != 0);
-    sprintf_s(device.consoleBuffer[DEVICE_STATE_BUTTON_BACK]          , "  - BACK     : %u", (device.state.Gamepad.wButtons & XINPUT_GAMEPAD_BACK) != 0);
-    sprintf_s(device.consoleBuffer[DEVICE_STATE_BUTTON_LEFT_THUMB]    , "  - LTHUMB   : %u", (device.state.Gamepad.wButtons & XINPUT_GAMEPAD_LEFT_THUMB) != 0);
-    sprintf_s(device.consoleBuffer[DEVICE_STATE_BUTTON_RIGHT_THUMB]   , "  - RTHUMB   : %u", (device.state.Gamepad.wButtons & XINPUT_GAMEPAD_RIGHT_THUMB) != 0);
-    sprintf_s(device.consoleBuffer[DEVICE_STATE_BUTTON_LEFT_SHOULDER] , "  - LSHOULDER: %u", (device.state.Gamepad.wButtons & XINPUT_GAMEPAD_LEFT_SHOULDER) != 0);
-    sprintf_s(device.consoleBuffer[DEVICE_STATE_BUTTON_RIGHT_SHOULDER], "  - RSHOULDER: %u", (device.state.Gamepad.wButtons & XINPUT_GAMEPAD_RIGHT_SHOULDER) != 0);
-    sprintf_s(device.consoleBuffer[DEVICE_STATE_BUTTON_GUIDE]         , "  - GUIDE    : %u", (device.state.Gamepad.wButtons & XINPUT_GAMEPAD_GUIDE) != 0);
-    sprintf_s(device.consoleBuffer[DEVICE_STATE_BUTTON_A]             , "  - A        : %u", (device.state.Gamepad.wButtons & XINPUT_GAMEPAD_A) != 0);
-    sprintf_s(device.consoleBuffer[DEVICE_STATE_BUTTON_B]             , "  - B        : %u", (device.state.Gamepad.wButtons & XINPUT_GAMEPAD_B) != 0);
-    sprintf_s(device.consoleBuffer[DEVICE_STATE_BUTTON_X]             , "  - X        : %u", (device.state.Gamepad.wButtons & XINPUT_GAMEPAD_X) != 0);
-    sprintf_s(device.consoleBuffer[DEVICE_STATE_BUTTON_Y]             , "  - Y        : %u", (device.state.Gamepad.wButtons & XINPUT_GAMEPAD_Y) != 0);
-    sprintf_s(device.consoleBuffer[DEVICE_STATE_LEFTTRIGGER]          , "  - LTrigger : %hhu", device.state.Gamepad.bLeftTrigger);
-    sprintf_s(device.consoleBuffer[DEVICE_STATE_RIGHTTRIGGER]         , "  - RTrigger : %hhu", device.state.Gamepad.bRightTrigger);
-    sprintf_s(device.consoleBuffer[DEVICE_STATE_LEFTTHUMBX]           , "  - Left X   : %hd", device.state.Gamepad.sThumbLX);
-    sprintf_s(device.consoleBuffer[DEVICE_STATE_LEFTTHUMBY]           , "  - Left Y   : %hd", device.state.Gamepad.sThumbLY);
-    sprintf_s(device.consoleBuffer[DEVICE_STATE_RIGHTTHUMBX]          , "  - Right X  : %hd", device.state.Gamepad.sThumbRX);
-    sprintf_s(device.consoleBuffer[DEVICE_STATE_RIGHTTHUMBY]          , "  - Right Y  : %hd", device.state.Gamepad.sThumbRY);
+    sprintf_s(device.consoleBuffer[DEVICE_STATE_BUTTON_DPAD_UP]       , "  - UP       : %u"  , (device.state.XinputState.Gamepad.wButtons & XINPUT_GAMEPAD_DPAD_UP) != 0);
+    sprintf_s(device.consoleBuffer[DEVICE_STATE_BUTTON_DPAD_DOWN]     , "  - DOWN     : %u"  , (device.state.XinputState.Gamepad.wButtons & XINPUT_GAMEPAD_DPAD_DOWN) != 0);
+    sprintf_s(device.consoleBuffer[DEVICE_STATE_BUTTON_DPAD_LEFT]     , "  - LEFT     : %u"  , (device.state.XinputState.Gamepad.wButtons & XINPUT_GAMEPAD_DPAD_LEFT) != 0);
+    sprintf_s(device.consoleBuffer[DEVICE_STATE_BUTTON_DPAD_RIGHT]    , "  - RIGHT    : %u"  , (device.state.XinputState.Gamepad.wButtons & XINPUT_GAMEPAD_DPAD_RIGHT) != 0);
+    sprintf_s(device.consoleBuffer[DEVICE_STATE_BUTTON_START]         , "  - START    : %u"  , (device.state.XinputState.Gamepad.wButtons & XINPUT_GAMEPAD_START) != 0);
+    sprintf_s(device.consoleBuffer[DEVICE_STATE_BUTTON_BACK]          , "  - BACK     : %u"  , (device.state.XinputState.Gamepad.wButtons & XINPUT_GAMEPAD_BACK) != 0);
+    sprintf_s(device.consoleBuffer[DEVICE_STATE_BUTTON_LEFT_THUMB]    , "  - LTHUMB   : %u"  , (device.state.XinputState.Gamepad.wButtons & XINPUT_GAMEPAD_LEFT_THUMB) != 0);
+    sprintf_s(device.consoleBuffer[DEVICE_STATE_BUTTON_RIGHT_THUMB]   , "  - RTHUMB   : %u"  , (device.state.XinputState.Gamepad.wButtons & XINPUT_GAMEPAD_RIGHT_THUMB) != 0);
+    sprintf_s(device.consoleBuffer[DEVICE_STATE_BUTTON_LEFT_SHOULDER] , "  - LSHOULDER: %u"  , (device.state.XinputState.Gamepad.wButtons & XINPUT_GAMEPAD_LEFT_SHOULDER) != 0);
+    sprintf_s(device.consoleBuffer[DEVICE_STATE_BUTTON_RIGHT_SHOULDER], "  - RSHOULDER: %u"  , (device.state.XinputState.Gamepad.wButtons & XINPUT_GAMEPAD_RIGHT_SHOULDER) != 0);
+    sprintf_s(device.consoleBuffer[DEVICE_STATE_BUTTON_GUIDE]         , "  - GUIDE    : %u"  , (device.state.XinputState.Gamepad.wButtons & XINPUT_GAMEPAD_GUIDE) != 0);
+    sprintf_s(device.consoleBuffer[DEVICE_STATE_BUTTON_A]             , "  - A        : %u"  , (device.state.XinputState.Gamepad.wButtons & XINPUT_GAMEPAD_A) != 0);
+    sprintf_s(device.consoleBuffer[DEVICE_STATE_BUTTON_B]             , "  - B        : %u"  , (device.state.XinputState.Gamepad.wButtons & XINPUT_GAMEPAD_B) != 0);
+    sprintf_s(device.consoleBuffer[DEVICE_STATE_BUTTON_X]             , "  - X        : %u"  , (device.state.XinputState.Gamepad.wButtons & XINPUT_GAMEPAD_X) != 0);
+    sprintf_s(device.consoleBuffer[DEVICE_STATE_BUTTON_Y]             , "  - Y        : %u"  , (device.state.XinputState.Gamepad.wButtons & XINPUT_GAMEPAD_Y) != 0);
+    sprintf_s(device.consoleBuffer[DEVICE_STATE_LEFTTRIGGER]          , "  - LTrigger : %hhu", device.state.XinputState.Gamepad.bLeftTrigger);
+    sprintf_s(device.consoleBuffer[DEVICE_STATE_RIGHTTRIGGER]         , "  - RTrigger : %hhu", device.state.XinputState.Gamepad.bRightTrigger);
+    sprintf_s(device.consoleBuffer[DEVICE_STATE_LEFTTHUMBX]           , "  - Left X   : %hd" , device.state.XinputState.Gamepad.sThumbLX);
+    sprintf_s(device.consoleBuffer[DEVICE_STATE_LEFTTHUMBY]           , "  - Left Y   : %hd" , device.state.XinputState.Gamepad.sThumbLY);
+    sprintf_s(device.consoleBuffer[DEVICE_STATE_RIGHTTHUMBX]          , "  - Right X  : %hd" , device.state.XinputState.Gamepad.sThumbRX);
+    sprintf_s(device.consoleBuffer[DEVICE_STATE_RIGHTTHUMBY]          , "  - Right Y  : %hd" , device.state.XinputState.Gamepad.sThumbRY);
+    // Custom state
+    sprintf_s(device.consoleBuffer[DEVICE_STATE_EXTRA_SHARE]          , "  - Share    : %hhu", device.state.GamepadExtras.dwExtraButtons & OPENXINPUT_GAMEPAD_EXTRAS_SHARE);
 }
 
 void PrintDeviceConsoleOutput(XInputDevice_t& device)
@@ -464,7 +474,7 @@ void OnDeviceInfoChange(XInputDevice_t& device)
 {
     BuildDeviceConsoleOutput(device);
     PrintDeviceConsoleOutput(device);
-    memcpy(&device.oldState.Gamepad, &device.state.Gamepad, sizeof(device.state.Gamepad));
+    memcpy(&device.oldState, &device.state, sizeof(device.state));
 }
 
 void OnDeviceConnect(XInputDevice_t& device)
@@ -475,14 +485,18 @@ void OnDeviceConnect(XInputDevice_t& device)
     memset(&device.oldState, 0, sizeof(device.oldState));
     memset(&device.state, 0, sizeof(device.state));
 
-    // When using a wireless controller, the battery infos are not ready right now.
-    for (int i = 0; i < 50 && device.battery.BatteryType == BATTERY_TYPE_DISCONNECTED; ++i)
-    {
-        OpenXInputGetBatteryInformation(device.deviceIndex, 0, &device.battery);
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    }
-
     OpenXInputGetCapabilitiesEx(1, device.deviceIndex, XINPUT_FLAG_GAMEPAD, &device.capabilities);
+
+    if (pOpenXInputGetDeviceUSBIds != nullptr)
+    {
+        pOpenXInputGetDeviceUSBIds(device.deviceIndex, &device.vendorId, &device.productId, &device.inputId);
+    }
+    else
+    {
+        device.vendorId = device.capabilities.VendorId;
+        device.productId = device.capabilities.ProductId;
+        device.inputId = 0xffff;
+    }
 
     WCHAR render[300];
     UINT renderCount = 300;
@@ -497,12 +511,16 @@ void OnDeviceConnect(XInputDevice_t& device)
 void OnDeviceDisconnect(XInputDevice_t& device)
 {
     device.connected = false;
-    memset(&device.battery, 0, sizeof(device.battery));
-    memset(&device.capabilities, 0, sizeof(device.capabilities));
-    memset(&device.oldState, 0, sizeof(device.oldState));
-    memset(&device.state, 0, sizeof(device.state));
+    memset(&device, 0, sizeof(device));
     
     OnDeviceInfoChange(device);
+}
+
+bool DeviceStateChanged(XInputDevice_t& device)
+{
+    // Don't test device.oldState in its entirety because some trash devices always send new XUSB packets even if there is no change.
+    return memcmp(&device.oldState.XinputState.Gamepad, &device.state.XinputState.Gamepad, sizeof(device.state.XinputState.Gamepad)) != 0 ||
+        memcmp(&device.oldState.GamepadExtras, &device.state.GamepadExtras, sizeof(device.state.GamepadExtras)) != 0;
 }
 
 int main(int argc, char* argv[])
@@ -516,6 +534,9 @@ int main(int argc, char* argv[])
         {// We are using OpenXinput, check for the max controller count.
             XinputMaxControllerCount = pfnOpenXInputGetMaxControllerCount_t();
         }
+
+        pOpenXInputGetDeviceUSBIds = (OpenXInputGetDeviceUSBIds_t*)GetProcAddress(hXinput, "OpenXInputGetDeviceUSBIds");
+        pOpenXInputGetStateFull = (OpenXInputGetStateFull_t*)GetProcAddress(hXinput, "OpenXInputGetStateFull");
     }
 #else
     OpenXinputInitLibrary();
@@ -539,13 +560,20 @@ int main(int argc, char* argv[])
         for (int i = 0; i < XinputMaxControllerCount; ++i)
         {
             XInputDevice_t& device = devices[i];
-            if (OpenXInputGetStateEx(i, &device.state) == ERROR_SUCCESS)
+            if ((pOpenXInputGetStateFull == nullptr ? XInputGetStateEx(i, &device.state.XinputState) : pOpenXInputGetStateFull(i, &device.state)) == ERROR_SUCCESS)
             {
+                if (device.battery.BatteryType == BATTERY_TYPE_DISCONNECTED &&
+                    OpenXInputGetBatteryInformation(device.deviceIndex, 0, &device.battery) == ERROR_SUCCESS &&
+                    device.battery.BatteryType != BATTERY_TYPE_DISCONNECTED)
+                {
+                    OnDeviceInfoChange(device);
+                }
+
                 if (device.connected == false)
                 {
                     OnDeviceConnect(device);
                 }
-                else if (memcmp(&device.oldState.Gamepad, &device.state.Gamepad, sizeof(device.state.Gamepad)) != 0)
+                else if (DeviceStateChanged(device))
                 {
                     OnDeviceInfoChange(device);
                 }

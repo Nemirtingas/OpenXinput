@@ -196,11 +196,10 @@ struct InGamepadState0101
 
 struct GamepadState0101
 {
-    BYTE  unk0;
-    BYTE  inputId;
+    WORD  XUSBVersion;
     BYTE  status;
     BYTE  unk2;
-    BYTE  unk3;
+    BYTE  inputId;
     DWORD dwPacketNumber;
     BYTE  unk4;
     BYTE  unk5;
@@ -275,6 +274,7 @@ struct InBaseBusInformation
 {
     WORD XUSBVersion;
     BYTE unk0;
+    BYTE padding;
     WORD field_4;
     WORD field_6;
     WORD field_8;
@@ -295,8 +295,7 @@ struct InBaseBusInformation
 
 struct OutBaseBusInformation
 {
-    BYTE field_0;
-    BYTE field_1;
+    WORD XUSBVersion;
     BYTE field_2;
     BYTE field_3;
     DWORD field_4;
@@ -2538,6 +2537,9 @@ HRESULT GetBaseBusInformation(DeviceInfo_t* pDevice, XINPUT_BASE_BUS_INFORMATION
     ZeroMemory(&InBuffer, sizeof(InBaseBusInformation));
     ZeroMemory(&OutBuffer, sizeof(OutBaseBusInformation));
 
+    InBuffer.XUSBVersion = XUSB_VERSION_1_4;
+    InBuffer.unk0 = 2;
+
     hr = SendReceiveIoctl(pDevice->hDevice, Protocol::IOCTL_XINPUT_GET_BASE_BUS_INFORMATION, &InBuffer, sizeof(InBaseBusInformation), &OutBuffer, sizeof(OutBaseBusInformation), nullptr);
     if (hr < 0)
         return hr;
@@ -3863,7 +3865,7 @@ DWORD WINAPI OpenXInputGetBaseBusInformation(_In_ DWORD dwBusIndex, _Out_ XINPUT
     HRESULT hr;
     GetBaseBusInformationApiParam_t apiParam;
 
-    if (dwBusIndex < DeviceList::BusDeviceListSize || pBaseBusInformation == nullptr)
+    if (dwBusIndex >= DeviceList::BusDeviceListSize || pBaseBusInformation == nullptr)
         return ERROR_BAD_ARGUMENTS;
 
     apiParam.pBaseBusInformation = pBaseBusInformation;

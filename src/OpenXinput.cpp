@@ -63,28 +63,22 @@ struct DeviceInfo_t {
 };
 // All theses structs are passed to the XUSB driver, they __NEED__ to be unaligned.
 #pragma pack(push, 1)
-struct InSetLEDBuffer_t
-{
-    BYTE deviceIndex;
-    BYTE state;
-    BYTE pad1;
-    BYTE pad2;
-    BYTE unk0;
-};
-
-struct InVibrationBuffer_t
-{
-    BYTE deviceIndex;
-    BYTE pad1;
-    BYTE leftMotorSpeed;
-    BYTE rightMotorSpeed;
-    BYTE unk0;
-};
-
-struct InGetAudioDeviceInformation_t
+struct InBaseRequest_t
 {
     WORD XUSBVersion;
     BYTE DeviceIndex;
+};
+
+#define XUSB_SET_STATE_FLAG_LED         ((BYTE)0x01)
+#define XUSB_SET_STATE_FLAG_VIBRATION   ((BYTE)0x02)
+
+struct InSetState_t
+{
+    BYTE deviceIndex;
+    BYTE ledState;
+    BYTE leftMotorSpeed;
+    BYTE rightMotorSpeed;
+    BYTE flags;
 };
 
 struct OutGetAudioDeviceInformation_t
@@ -93,12 +87,6 @@ struct OutGetAudioDeviceInformation_t
     WORD vendorId;
     WORD productId;
     BYTE inputId;
-};
-
-struct InGetLEDBuffer_t
-{
-    WORD XUSBVersion;
-    BYTE DeviceIndex;
 };
 
 struct OutGetLEDBuffer_t
@@ -116,42 +104,6 @@ struct OutDeviceInfos_t
     WORD unk3;
     WORD vendorId;
     WORD productId;
-};
-
-struct InPowerOffBuffer_t
-{
-    WORD XUSBVersion;
-    BYTE DeviceIndex;
-};
-
-struct InWaitForGuideButtonBuffer_t
-{
-    WORD XUSBVersion;
-    BYTE DeviceIndex;
-};
-
-struct OutWaitForGuideButtonBuffer_t
-{
-    WORD XUSBVersion;
-    BYTE status;
-    BYTE field_3;
-    BYTE field_4;
-    DWORD field_5;
-    BYTE field_9;
-    BYTE field_A;
-    WORD field_B;
-    BYTE field_D;
-    BYTE field_E;
-    WORD field_F;
-    WORD field_11;
-    WORD field_13;
-    WORD field_15;
-    BYTE field_17;
-    BYTE field_18;
-    BYTE field_19;
-    BYTE field_1A;
-    BYTE field_1B;
-    BYTE field_1C;
 };
 
 struct InGamepadState0100
@@ -175,19 +127,12 @@ struct GamepadState0100
     SHORT sThumbRY;
 };
 
-struct InGamepadState0101
-{
-    WORD XUSBVersion;
-    BYTE DeviceIndex;
-};
-
 struct GamepadState0101
 {
-    BYTE  unk0;
-    BYTE  inputId;
+    WORD  XUSBVersion;
     BYTE  status;
     BYTE  unk2;
-    BYTE  unk3;
+    BYTE  inputId;
     DWORD dwPacketNumber;
     BYTE  unk4;
     BYTE  unk5;
@@ -204,12 +149,6 @@ struct GamepadState0101
     BYTE  unk9;
     BYTE  unk10;
     BYTE  bExtraButtons;
-};
-
-struct InGamepadCapabilities0101
-{
-    WORD XUSBVersion;
-    BYTE DeviceIndex;
 };
 
 struct GamepadCapabilities0101
@@ -1781,28 +1720,28 @@ BOOL CheckForDriverHook(DWORD driverHook, LPVOID hookFunction)
 
 HRESULT SendLEDState(DeviceInfo_t* pDevice, BYTE ledState)
 {
-    InSetLEDBuffer_t inBuffer = {
+    InSetState_t inBuffer = {
         pDevice->dwUserIndex,
         ledState,
         0,
         0,
-        1
+        XUSB_SET_STATE_FLAG_LED
     };
 
-    return SendIoctl(pDevice->hDevice, Protocol::IOCTL_XINPUT_SET_GAMEPAD_STATE, &inBuffer, sizeof(InSetLEDBuffer_t));
+    return SendIoctl(pDevice->hDevice, Protocol::IOCTL_XINPUT_SET_GAMEPAD_STATE, &inBuffer, sizeof(InSetState_t));
 }
 
 HRESULT SendDeviceVibration(DeviceInfo_t* pDevice)
 {
-    InVibrationBuffer_t inBuffer = {
+    InSetState_t inBuffer = {
         pDevice->dwUserIndex,
         0,
         (BYTE)(pDevice->DeviceVibration.wLeftMotorSpeed / 256),
         (BYTE)(pDevice->DeviceVibration.wRightMotorSpeed / 256),
-        2
+        XUSB_SET_STATE_FLAG_VIBRATION
     };
 
-    return SendIoctl(pDevice->hDevice, Protocol::IOCTL_XINPUT_SET_GAMEPAD_STATE, &inBuffer, sizeof(InVibrationBuffer_t));
+    return SendIoctl(pDevice->hDevice, Protocol::IOCTL_XINPUT_SET_GAMEPAD_STATE, &inBuffer, sizeof(InSetState_t));
 }
 
 HRESULT GetDeviceInfoFromInterface(HANDLE hDevice, OutDeviceInfos_t* pDeviceInfos)
@@ -1822,7 +1761,7 @@ HRESULT GetLatestDeviceInfo(DeviceInfo_t* pDevice)
 
     union {
         InGamepadState0100 in0100;
-        InGamepadState0101 in0101;
+        InBaseRequest_t in0101;
     } inBuffer = {};
 
     DWORD inSize;
@@ -1887,7 +1826,7 @@ HRESULT GetCapabilities(DeviceInfo_t* pDevice, XINPUT_CAPABILITIES* pCapabilitie
         }
     };
     HRESULT hr;
-    InGamepadCapabilities0101 InBuffer;
+    InBaseRequest_t InBuffer;
     GamepadCapabilities0101 OutBuffer;
 
     if (pDevice->XUSBVersion == XUSB_VERSION_1_0)
@@ -1897,7 +1836,7 @@ HRESULT GetCapabilities(DeviceInfo_t* pDevice, XINPUT_CAPABILITIES* pCapabilitie
     InBuffer.DeviceIndex = pDevice->dwUserIndex;
     ZeroMemory(&OutBuffer, sizeof(GamepadCapabilities0101));
 
-    hr = SendReceiveIoctl(pDevice->hDevice, Protocol::IOCTL_XINPUT_GET_CAPABILITIES, &InBuffer, sizeof(InGamepadCapabilities0101), &OutBuffer, sizeof(GamepadCapabilities0101), nullptr);
+    hr = SendReceiveIoctl(pDevice->hDevice, Protocol::IOCTL_XINPUT_GET_CAPABILITIES, &InBuffer, sizeof(InBaseRequest_t), &OutBuffer, sizeof(GamepadCapabilities0101), nullptr);
     if (hr >= 0)
         TranslateCapabilities(&OutBuffer, pCapabilities);
 
@@ -1953,7 +1892,7 @@ HRESULT GetBatteryInformation(DeviceInfo_t* pDevice, BYTE DeviceType, XINPUT_BAT
 HRESULT GetAudioDeviceInformation(DeviceInfo_t* pDevice, DeviceInfo::XINPUT_AUDIO_INFORMATION* pAudioInformation)
 {
     HRESULT hr;
-    InGetAudioDeviceInformation_t InBuffer;
+    InBaseRequest_t InBuffer;
     OutGetAudioDeviceInformation_t OutBuffer;
 
     if (pDevice->XUSBVersion < XUSB_VERSION_1_2)
@@ -1961,7 +1900,7 @@ HRESULT GetAudioDeviceInformation(DeviceInfo_t* pDevice, DeviceInfo::XINPUT_AUDI
 
     InBuffer.XUSBVersion = XUSB_VERSION_1_2;
     InBuffer.DeviceIndex = pDevice->dwUserIndex;
-    hr = SendReceiveIoctl(pDevice->hDevice, Protocol::IOCTL_XINPUT_GET_AUDIO_INFORMATION, &InBuffer, sizeof(InGetAudioDeviceInformation_t), &OutBuffer, sizeof(OutGetAudioDeviceInformation_t), nullptr);
+    hr = SendReceiveIoctl(pDevice->hDevice, Protocol::IOCTL_XINPUT_GET_AUDIO_INFORMATION, &InBuffer, sizeof(InBaseRequest_t), &OutBuffer, sizeof(OutGetAudioDeviceInformation_t), nullptr);
     if (hr >= 0)
     {
         pAudioInformation->vendorId = OutBuffer.vendorId;
@@ -1973,7 +1912,7 @@ HRESULT GetAudioDeviceInformation(DeviceInfo_t* pDevice, DeviceInfo::XINPUT_AUDI
 
 HRESULT GetLEDState(DeviceInfo_t* pDevice, BYTE* ledState)
 {
-    InGetLEDBuffer_t inBuffer;
+    InBaseRequest_t inBuffer;
     OutGetLEDBuffer_t outBuffer;
     HRESULT hr;
 
@@ -1983,7 +1922,7 @@ HRESULT GetLEDState(DeviceInfo_t* pDevice, BYTE* ledState)
 
     inBuffer.XUSBVersion = XUSB_VERSION_1_1;
     inBuffer.DeviceIndex = pDevice->dwUserIndex;
-    hr = SendReceiveIoctl(pDevice->hDevice, Protocol::IOCTL_XINPUT_GET_LED_STATE, &inBuffer, sizeof(InGetLEDBuffer_t), &outBuffer, sizeof(OutGetLEDBuffer_t), nullptr);
+    hr = SendReceiveIoctl(pDevice->hDevice, Protocol::IOCTL_XINPUT_GET_LED_STATE, &inBuffer, sizeof(InBaseRequest_t), &outBuffer, sizeof(OutGetLEDBuffer_t), nullptr);
     if (hr >= 0)
     {
         *ledState = outBuffer.LEDState;
@@ -1994,14 +1933,14 @@ HRESULT GetLEDState(DeviceInfo_t* pDevice, BYTE* ledState)
 
 HRESULT PowerOffController(DeviceInfo_t* pDevice)
 {
-    InPowerOffBuffer_t inBuff;
+    InBaseRequest_t inBuff;
 
     if (pDevice->XUSBVersion < XUSB_VERSION_1_2)
         return E_FAIL;
 
     inBuff.XUSBVersion = XUSB_VERSION_1_2;
     inBuff.DeviceIndex = pDevice->dwUserIndex;
-    return SendIoctl(pDevice->hDevice, Protocol::IOCTL_XINPUT_POWER_DOWN_DEVICE, &inBuff, sizeof(InPowerOffBuffer_t));
+    return SendIoctl(pDevice->hDevice, Protocol::IOCTL_XINPUT_POWER_DOWN_DEVICE, &inBuff, sizeof(InBaseRequest_t));
 }
 
 HRESULT WaitForGuideButton(HANDLE hDevice, DWORD dwUserIndex, XINPUT_LISTEN_STATE* pListenState)
@@ -2010,8 +1949,8 @@ HRESULT WaitForGuideButton(HANDLE hDevice, DWORD dwUserIndex, XINPUT_LISTEN_STAT
     HANDLE hEvent;
     OVERLAPPED overlapped;
     DWORD receivedBytes;
-    InWaitForGuideButtonBuffer_t inBuffer;
-    OutWaitForGuideButtonBuffer_t outBuffer;
+    InBaseRequest_t inBuffer;
+    GamepadState0101 outBuffer;
 
     hEvent = CreateEvent(nullptr, TRUE, FALSE, nullptr);
     if (hEvent == nullptr)
@@ -2026,9 +1965,9 @@ HRESULT WaitForGuideButton(HANDLE hDevice, DWORD dwUserIndex, XINPUT_LISTEN_STAT
     inBuffer.XUSBVersion = XUSB_VERSION_1_2;
     inBuffer.DeviceIndex = (BYTE)dwUserIndex;
 
-    ZeroMemory(&outBuffer, sizeof(OutWaitForGuideButtonBuffer_t));
+    ZeroMemory(&outBuffer, sizeof(GamepadState0101));
 
-    hr = SendReceiveIoctl(hDevice, Protocol::IOCTL_XINPUT_WAIT_FOR_GUIDE_BUTTON, &inBuffer, sizeof(InWaitForGuideButtonBuffer_t), &outBuffer, sizeof(OutWaitForGuideButtonBuffer_t), &overlapped);
+    hr = SendReceiveIoctl(hDevice, Protocol::IOCTL_XINPUT_WAIT_FOR_GUIDE_BUTTON, &inBuffer, sizeof(InBaseRequest_t), &outBuffer, sizeof(GamepadState0101), &overlapped);
     if (hr < 0 && hr != E_PENDING)
     {
         CloseHandle(hEvent);
@@ -2040,19 +1979,19 @@ HRESULT WaitForGuideButton(HANDLE hDevice, DWORD dwUserIndex, XINPUT_LISTEN_STAT
     pListenState->Status = ERROR_IO_PENDING;
     if (GetOverlappedResult(hDevice, &overlapped, &receivedBytes, TRUE) != FALSE)
     {
-        if (receivedBytes == sizeof(OutWaitForGuideButtonBuffer_t))
+        if (receivedBytes == sizeof(GamepadState0101))
         {
             if (outBuffer.status == 1)
             {
                 pListenState->Status = 0;
-                pListenState->unk1 = outBuffer.field_5;
-                pListenState->unk2 = outBuffer.field_B;
-                pListenState->unk3 = outBuffer.field_D;
-                pListenState->unk4 = outBuffer.field_E;
-                pListenState->unk5 = outBuffer.field_F;
-                pListenState->unk6 = outBuffer.field_11;
-                pListenState->unk7 = outBuffer.field_13;
-                pListenState->unk8 = outBuffer.field_15;
+                pListenState->State.dwPacketNumber   = outBuffer.dwPacketNumber;
+                pListenState->State.Gamepad.wButtons = outBuffer.wButtons;
+                pListenState->State.Gamepad.bLeftTrigger  = outBuffer.bLeftTrigger;
+                pListenState->State.Gamepad.bRightTrigger = outBuffer.bRightTrigger;
+                pListenState->State.Gamepad.sThumbLX = outBuffer.sThumbLX;
+                pListenState->State.Gamepad.sThumbLY = outBuffer.sThumbLY;
+                pListenState->State.Gamepad.sThumbRX = outBuffer.sThumbRX;
+                pListenState->State.Gamepad.sThumbRY = outBuffer.sThumbRY;
             }
             else
             {

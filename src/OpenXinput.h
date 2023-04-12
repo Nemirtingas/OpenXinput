@@ -431,21 +431,14 @@ typedef struct _XINPUT_CAPABILITIES_EX
 typedef struct _XINPUT_LISTEN_STATE
 {
     DWORD Status;
-    DWORD unk1;
-    WORD unk2;
-    BYTE unk3;
-    BYTE unk4;
-    WORD unk5;
-    WORD unk6;
-    WORD unk7;
-    WORD unk8;
+    XINPUT_STATE State;
 } XINPUT_LISTEN_STATE, * PXINPUT_LISTEN_STATE;
 
 typedef struct _XINPUT_BASE_BUS_INFORMATION
 {
     WORD vendorId;
     WORD productId;
-    WORD inputId;
+    WORD productVersion;
     WORD field_6;
     DWORD field_8;
     BYTE field_C;

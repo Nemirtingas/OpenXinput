@@ -561,7 +561,7 @@ int main(int argc, char* argv[])
         for (int i = 0; i < XinputMaxControllerCount; ++i)
         {
             XInputDevice_t& device = devices[i];
-            if ((pOpenXInputGetStateFull == nullptr ? XInputGetStateEx(i, &device.state.XinputState) : pOpenXInputGetStateFull(i, &device.state)) == ERROR_SUCCESS)
+            if ((pOpenXInputGetStateFull == nullptr ? OpenXInputGetStateEx(i, &device.state.XinputState) : pOpenXInputGetStateFull(i, &device.state)) == ERROR_SUCCESS)
             {
                 if (device.battery.BatteryType == BATTERY_TYPE_DISCONNECTED &&
                     OpenXInputGetBatteryInformation(device.deviceIndex, 0, &device.battery) == ERROR_SUCCESS &&

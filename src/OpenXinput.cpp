@@ -3747,7 +3747,7 @@ DWORD WINAPI OpenXInputGetStateEx(_In_ DWORD dwUserIndex, _Out_ XINPUT_STATE* pS
     result = OpenXInputGetStateFull(dwUserIndex, &stateFull);
     if (result == ERROR_SUCCESS)
     {
-        memcpy(pState, &stateFull.XinputState.Gamepad, sizeof(XINPUT_STATE));
+        memcpy(pState, &stateFull.XinputState, sizeof(XINPUT_STATE));
     }
 
     return result;

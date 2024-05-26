@@ -1,8 +1,8 @@
-# OpenXinput
-This library can help you manage more than 4 xinput gamepads on Windows.
+# OpenXInput
+An open-source re-implementation of the XInput driver for Windows that allows for use of more than 4 XInput devices, while maintaining compatibility with standard XInput.
 
-## Why ?
-Because the legit Xinput library can only handle 4 XUSB devices while the underlying driver can handle more, with this library, you can use more than 4 controllers if you want to.
+## Purpose
+Standard XInput can only handle 4 devices, but the underlying XUSB driver can handle more. By using OpenXInput, you can bypass this limitation and set your own controller limit at compile-time.
 
-## How to use ?
-See the [wiki](https://github.com/Nemirtingas/OpenXinput/wiki).
+## Usage
+See the [wiki](../../wiki).

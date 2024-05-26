@@ -2,17 +2,19 @@
 
 #ifdef OPENXINPUT_BUILD_SHARED
 
-#define OpenXInputGetState                  XInputGetState
-#define OpenXInputSetState                  XInputSetState
-#define OpenXInputGetCapabilities           XInputGetCapabilities
-#define OpenXInputEnable                    XInputEnable
-#define OpenXInputGetDSoundAudioDeviceGuids XInputGetDSoundAudioDeviceGuids
-#define OpenXInputGetBatteryInformation     XInputGetBatteryInformation
-#define OpenXInputGetKeystroke              XInputGetKeystroke
-#define OpenXInputGetStateEx                XInputGetStateEx
-#define OpenXInputWaitForGuideButton        XInputWaitForGuideButton
-#define OpenXInputCancelGuideButtonWait     XInputCancelGuideButtonWait
-#define OpenXInputPowerOffController        XInputPowerOffController
+#define OpenXInputGetState              XInputGetState
+#define OpenXInputSetState              XInputSetState
+#define OpenXInputGetCapabilities       XInputGetCapabilities
+#define OpenXInputEnable                XInputEnable
+#define OpenXInputGetAudioDeviceIds     XInputGetAudioDeviceIds
+#define OpenXInputGetBatteryInformation XInputGetBatteryInformation
+#define OpenXInputGetKeystroke          XInputGetKeystroke
+#define OpenXInputGetStateEx            XInputGetStateEx
+#define OpenXInputWaitForGuideButton    XInputWaitForGuideButton
+#define OpenXInputCancelGuideButtonWait XInputCancelGuideButtonWait
+#define OpenXInputPowerOffController    XInputPowerOffController
+#define OpenXInputGetBaseBusInformation XInputGetBaseBusInformation
+#define OpenXInputGetCapabilitiesEx     XInputGetCapabilitiesEx
 
 #else
 
@@ -399,11 +401,34 @@ typedef DWORD(WINAPI OpenXInputGetStateFull_t)(DWORD, OPENXINPUT_STATE_FULL*);
 ////////////////////////////////////////
 // Here lies the hidden part on Xinput
 
+typedef struct _XINPUT_CAPABILITIES_EX
+{
+    XINPUT_CAPABILITIES Capabilities;
+    WORD VendorId;
+    WORD ProductId;
+    WORD ProductVersion;
+    WORD unk1;
+    DWORD unk2;
+} XINPUT_CAPABILITIES_EX, *PXINPUT_CAPABILITIES_EX;
+
 typedef struct _XINPUT_LISTEN_STATE
 {
     DWORD Status;
     XINPUT_STATE State;
 } XINPUT_LISTEN_STATE, * PXINPUT_LISTEN_STATE;
+
+typedef struct _XINPUT_BASE_BUS_INFORMATION
+{
+    WORD vendorId;
+    WORD productId;
+    WORD productVersion;
+    WORD field_6;
+    DWORD field_8;
+    BYTE field_C;
+    BYTE field_D;
+    BYTE field_E;
+    BYTE field_F;
+} XINPUT_BASE_BUS_INFORMATION, *PXINPUT_BASE_BUS_INFORMATION;
 
 struct XINPUT_GUIDE_EVENT
 {
@@ -435,6 +460,19 @@ DWORD WINAPI OpenXInputWaitForGuideButton(_In_ DWORD dwUserIndex, _In_ HANDLE hE
 DWORD WINAPI OpenXInputCancelGuideButtonWait(_In_ DWORD dwUserIndex);
 
 DWORD WINAPI OpenXInputPowerOffController(_In_ DWORD dwUserIndex);
+
+DWORD WINAPI OpenXInputGetBaseBusInformation(
+    _In_ DWORD dwBusIndex,                                 // Must be between in the range [0-16)
+    _Out_ XINPUT_BASE_BUS_INFORMATION* pBaseBusInformation // 
+);
+
+DWORD WINAPI OpenXInputGetCapabilitiesEx
+(
+    _In_  DWORD                   dwReserved,     // Must be 1
+    _In_  DWORD                   dwUserIndex,    // Index of the gamer associated with the device
+    _In_  DWORD                   dwFlags,        // Input flags that identify the device type
+    _Out_ XINPUT_CAPABILITIES_EX* pCapabilitiesEx // Receives the capabilities
+);
 
 #ifdef __cplusplus
 }

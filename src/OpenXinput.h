@@ -391,12 +391,19 @@ DWORD WINAPI OpenXInputGetStateFull
     _Out_ OPENXINPUT_STATE_FULL* pState        // Receives the current state
 );
 
+DWORD WINAPI OpenXInputGetDeviceHandle
+(
+    _In_  DWORD   dwUserIndex,    // Index of the gamer associated with the device
+    _Out_ HANDLE* pDeviceHandle   // The device handle
+);
+
 #ifdef __cplusplus
 }
 #endif
 typedef DWORD(WINAPI OpenXInputGetMaxControllerCount_t)();
 typedef DWORD(WINAPI OpenXInputGetDeviceUSBIds_t)(DWORD, WORD*, WORD*, WORD*);
 typedef DWORD(WINAPI OpenXInputGetStateFull_t)(DWORD, OPENXINPUT_STATE_FULL*);
+typedef DWORD(WINAPI OpenXInputGetDeviceHandle_t)(DWORD, HANDLE*);
 
 ////////////////////////////////////////
 // Here lies the hidden part on Xinput

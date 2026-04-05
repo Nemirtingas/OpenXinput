@@ -315,6 +315,11 @@ struct GetDeviceUSBIdsApiParam_t
     WORD* pInputId;
 };
 
+struct GetDeviceHandleApiParam_t
+{
+    HANDLE* pDeviceHandle;
+};
+
 constexpr DWORD SET_USER_LED_ON_CREATE       = (1 << 0);
 constexpr DWORD DISABLE_USER_LED_ON_DESTROY  = (1 << 1);
 constexpr DWORD DISABLE_VIBRATION_ON_DESTROY = (1 << 2);
@@ -1954,6 +1959,18 @@ HRESULT GetDeviceUSBIds(DeviceInfo_t* pDevice, void* pParams, DWORD reserved)
     *pApiParam->pVendorId = pDevice->vendorId;
     *pApiParam->pProductId = pDevice->productId;
     *pApiParam->pInputId = pDevice->inputId;
+
+    return S_OK;
+}
+
+HRESULT GetDeviceHandle(DeviceInfo_t* pDevice, void* pParams, DWORD reserved)
+{
+    GetDeviceHandleApiParam_t* pApiParam = (GetDeviceHandleApiParam_t*)pParams;
+
+    if (IsDeviceInactive(pDevice))
+        return E_FAIL;
+
+    *pApiParam->pDeviceHandle = pDevice->hDevice;
 
     return S_OK;
 }
@@ -3865,6 +3882,23 @@ DWORD WINAPI OpenXInputGetStateFull(_In_  DWORD dwUserIndex, _Out_ OPENXINPUT_ST
         hr = XInputCore::ProcessAPIRequest(dwUserIndex, XInputInternal::DeviceInfo::g_pfnGetStateDispatcher, &apiParam, 1, FALSE);
         result = XInputReturnCodeFromHRESULT(hr);
     }
+    return result;
+}
+
+DWORD WINAPI OpenXInputGetDeviceHandle(_In_ DWORD dwUserIndex, _Out_ HANDLE* pDeviceHandle)
+{
+    DWORD result;
+    HRESULT hr;
+    GetDeviceHandleApiParam_t apiParam;
+
+    if (dwUserIndex >= XUSER_MAX_COUNT)
+        return ERROR_BAD_ARGUMENTS;
+
+    apiParam.pDeviceHandle = pDeviceHandle;
+
+    hr = XInputCore::ProcessAPIRequest(dwUserIndex, XInputInternal::DeviceInfo::GetDeviceHandle, &apiParam, 1, FALSE);
+    result = XInputReturnCodeFromHRESULT(hr);
+
     return result;
 }
 

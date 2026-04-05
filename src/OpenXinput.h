@@ -15,6 +15,7 @@
 #define OpenXInputPowerOffController    XInputPowerOffController
 #define OpenXInputGetBaseBusInformation XInputGetBaseBusInformation
 #define OpenXInputGetCapabilitiesEx     XInputGetCapabilitiesEx
+#define OpenXInputGetSystemButtons      XInputGetSystemButtons
 
 #else
 
@@ -353,51 +354,6 @@ DWORD WINAPI OpenXInputGetDSoundAudioDeviceGuids
 
 // End of Xinput.h
 
-//
-// Constants for extra gamepad buttons
-//
-#define OPENXINPUT_GAMEPAD_EXTRAS_SHARE 0x000000001
-
-typedef struct _OPENXINPUT_GAMEPAD_EXTRAS
-{
-    DWORD                               dwExtraButtons;
-} OPENXINPUT_GAMEPAD_EXTRAS, *POPENXINPUT_GAMEPAD_EXTRAS;
-
-typedef struct _OPENXINPUT_STATE_FULL
-{
-    XINPUT_STATE                        XinputState;
-    OPENXINPUT_GAMEPAD_EXTRAS           GamepadExtras;
-} OPENXINPUT_STATE_FULL, *POPENXINPUT_STATE_FULL;
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-// This is my own added exported symbol.
-// It returns the compile-time XUSER_MAX_COUNT.
-DWORD WINAPI OpenXInputGetMaxControllerCount();
-
-DWORD WINAPI OpenXInputGetDeviceUSBIds
-(
-    _In_  DWORD dwUserIndex, // Index of the gamer associated with the device
-    _Out_ WORD* pVendorId  , // USB device vendor ID
-    _Out_ WORD* pProductId , // USB device product ID
-    _Out_ WORD* pInputId     // USB device input ID
-);
-
-DWORD WINAPI OpenXInputGetStateFull
-(
-    _In_  DWORD                  dwUserIndex,  // Index of the gamer associated with the device
-    _Out_ OPENXINPUT_STATE_FULL* pState        // Receives the current state
-);
-
-#ifdef __cplusplus
-}
-#endif
-typedef DWORD(WINAPI OpenXInputGetMaxControllerCount_t)();
-typedef DWORD(WINAPI OpenXInputGetDeviceUSBIds_t)(DWORD, WORD*, WORD*, WORD*);
-typedef DWORD(WINAPI OpenXInputGetStateFull_t)(DWORD, OPENXINPUT_STATE_FULL*);
-
 ////////////////////////////////////////
 // Here lies the hidden part on Xinput
 
@@ -436,6 +392,18 @@ struct XINPUT_GUIDE_EVENT
     PXINPUT_LISTEN_STATE pListenState;
 };
 
+typedef struct _XINPUT_SYSTEM_BUTTONS
+{
+    DWORD StandardSystemButtons; // Only XINPUT_GAMEPAD_GUIDE
+    DWORD ExtraSystemButtons; // Only XINPUT_GAMEPAD_EXTRAS_SHARE
+    DWORD MoreSystemButtons1;
+    DWORD MoreSystemButtons2;
+    DWORD MoreSystemButtons3;
+    DWORD MoreSystemButtons4;
+    DWORD MoreSystemButtons5;
+    DWORD MoreSystemButtons6;
+} XINPUT_SYSTEM_BUTTONS, *PXINPUT_SYSTEM_BUTTONS;
+
 #ifndef XINPUT_GAMEPAD_GUIDE
 #define XINPUT_GAMEPAD_GUIDE 0x0400
 #endif
@@ -447,6 +415,48 @@ struct XINPUT_GUIDE_EVENT
     (XINPUT_GAMEPAD_A)|(XINPUT_GAMEPAD_B)|(XINPUT_GAMEPAD_X)|(XINPUT_GAMEPAD_Y))
 
 #define XINPUT_BUTTON_MASK ((XINPUT_BUTTON_MASK_WITHOUT_GUIDE)|XINPUT_GAMEPAD_GUIDE)
+
+
+//
+// Constants for extra gamepad buttons
+//
+#define XINPUT_GAMEPAD_EXTRAS_SHARE 0x000000001
+
+typedef struct _OPENXINPUT_STATE_FULL
+{
+    XINPUT_STATE                        XinputState;
+    XINPUT_SYSTEM_BUTTONS               XinputSystemButtons;
+} OPENXINPUT_STATE_FULL, * POPENXINPUT_STATE_FULL;
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+    // This is my own added exported symbol.
+    // It returns the compile-time XUSER_MAX_COUNT.
+    DWORD WINAPI OpenXInputGetMaxControllerCount();
+
+    DWORD WINAPI OpenXInputGetDeviceUSBIds
+    (
+        _In_  DWORD dwUserIndex, // Index of the gamer associated with the device
+        _Out_ WORD* pVendorId, // USB device vendor ID
+        _Out_ WORD* pProductId, // USB device product ID
+        _Out_ WORD* pInputId     // USB device input ID
+    );
+
+    DWORD WINAPI OpenXInputGetStateFull
+    (
+        _In_  DWORD                  dwUserIndex,  // Index of the gamer associated with the device
+        _Out_ OPENXINPUT_STATE_FULL* pState        // Receives the current state
+    );
+
+#ifdef __cplusplus
+}
+#endif
+typedef DWORD(WINAPI OpenXInputGetMaxControllerCount_t)();
+typedef DWORD(WINAPI OpenXInputGetDeviceUSBIds_t)(DWORD, WORD*, WORD*, WORD*);
+typedef DWORD(WINAPI OpenXInputGetStateFull_t)(DWORD, OPENXINPUT_STATE_FULL*);
+
 
 #ifdef __cplusplus
 extern "C" {
@@ -473,6 +483,11 @@ DWORD WINAPI OpenXInputGetCapabilitiesEx
     _In_  DWORD                   dwFlags,        // Input flags that identify the device type
     _Out_ XINPUT_CAPABILITIES_EX* pCapabilitiesEx // Receives the capabilities
 );
+
+DWORD WINAPI OpenXInputGetSystemButtons(
+    _In_ DWORD dwUserIndex,
+    _In_ XINPUT_SYSTEM_BUTTONS* pSystemButtons,
+    _In_ PVOID vReserved);
 
 #ifdef __cplusplus
 }
